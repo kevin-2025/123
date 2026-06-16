@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电力交易辅助决策系统 - 方案一：科技深色风格</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0e1a;
+  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", "Segoe UI", sans-serif;
+  min-height: 100vh;
+  padding-bottom: 40px;
+}
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 100vh;
+  background: rgba(10, 14, 26, 0.95);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  padding: 20px 14px;
+  z-index: 200;
+}
+.sidebar .logo {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8e8ff;
+  padding: 0 8px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 16px;
+}
+.sidebar .menu-group {
+  margin-bottom: 20px;
+}
+.sidebar .menu-title {
+  font-size: 11px;
+  color: #555;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.sidebar .menu-item {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  color: #b9c5df;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 6px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar .menu-item:hover {
+  background: rgba(90,122,255,0.12);
+  border-color: rgba(90,122,255,0.22);
+}
+.sidebar .menu-item.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(91,138,247,.32), rgba(78,205,196,.20));
+  border-color: rgba(91,138,247,.45);
+}
+.main-area { margin-left: 200px; }
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: rgba(15, 20, 35, 0.65);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header h1 { font-size: 18px; font-weight: 600; color: #e8e8ff; }
+.header-controls { display: flex; align-items: center; gap: 12px; }
+.header-controls input[type="date"] {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 24px;
+}
+.kpi-card {
+  flex: 1 1 140px;
+  min-width: 120px;
+  background: rgba(15, 20, 35, 0.65);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px;
+}
+.kpi-card .label {
+  font-size: 11px;
+  color: #74819c;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.kpi-card .value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #e8e8ff;
+  margin-bottom: 4px;
+}
+.kpi-card .value.up { color: #fc6161; }
+.kpi-card .value.down { color: #52c41a; }
+.kpi-card .unit { font-size: 11px; color: #555; }
+.kpi-card .change {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.kpi-card .change.positive { color: #52c41a; }
+.kpi-card .change.negative { color: #fc6161; }
+.section-wrap {
+  padding: 0 24px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.chart-panel {
+  background: rgba(15, 20, 35, 0.65);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.chart-panel.span-all { grid-column: 1 / -1; }
+.chart-panel .chart-title {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #bcc;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-panel .chart-title .icon { font-size: 16px; }
+.chart-panel .chart-container { width: 100%; height: 280px; }
+.data-table-wrap { padding: 12px 16px; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  color: #888;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: #ccc;
+}
+.data-table tr:hover td { background: rgba(255,255,255,0.02); }
+.footer {
+  padding: 16px 24px;
+  font-size: 11px;
+  color: #444;
+}
+@media (max-width: 900px) {
+  .sidebar { width: 140px; }
+  .main-area { margin-left: 140px; }
+  .section-wrap { grid-template-columns: 1fr; }
+  .kpi-card { flex: 1 1 100px; }
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo">⚡ 电力交易系统</div>
+  <div class="menu-group">
+    <div class="menu-title">市场行情</div>
+    <button class="menu-item active"><span>📊</span> 行情看板</button>
+    <button class="menu-item"><span>📈</span> 行情分析</button>
+    <button class="menu-item"><span>💰</span> 价差分析</button>
+  </div>
+  <div class="menu-group">
+    <div class="menu-title">辅助决策</div>
+    <button class="menu-item"><span>⚡</span> 现货决策</button>
+    <button class="menu-item"><span>📋</span> 中长期管理</button>
+    <button class="menu-item"><span>🔮</span> 电价预测</button>
+  </div>
+  <div class="menu-group">
+    <div class="menu-title">结算管理</div>
+    <button class="menu-item"><span>📅</span> 日结算</button>
+    <button class="menu-item"><span>📆</span> 月结算</button>
+    <button class="menu-item"><span>🧾</span> 账单查询</button>
+  </div>
+  <div class="menu-group">
+    <div class="menu-title">数据管理</div>
+    <button class="menu-item"><span>🌐</span> 公有数据</button>
+    <button class="menu-item"><span>🔒</span> 私有数据</button>
+    <button class="menu-item"><span>⚙️</span> 系统配置</button>
+  </div>
+</div>
+<div class="main-area">
+  <div class="header">
+    <h1>市场行情看板</h1>
+    <div class="header-controls">
+      <input type="date" value="2026-05-26">
+      <span style="color:#555;font-size:12px;">方案一：科技深色风格</span>
+    </div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">最大负荷</div>
+      <div class="value up">47,165</div>
+      <div class="unit">MW</div>
+      <div class="change positive">↑ 5.2% 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">平均负荷</div>
+      <div class="value">39,227</div>
+      <div class="unit">MW</div>
+      <div class="change positive">↑ 2.1% 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">最高电价</div>
+      <div class="value up">285.22</div>
+      <div class="unit">元/MWh</div>
+      <div class="change positive">↑ 12.5%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">平均电价</div>
+      <div class="value">90.89</div>
+      <div class="unit">元/MWh</div>
+      <div class="change negative">↓ 3.2%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">新能源出力</div>
+      <div class="value">7,647</div>
+      <div class="unit">MW</div>
+      <div class="change positive">↑ 8.3%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">合约比例</div>
+      <div class="value">108%</div>
+      <div class="unit"></div>
+      <div class="change positive">达标</div>
+    </div>
+  </div>
+  <div class="section-wrap">
+    <div class="chart-panel span-all">
+      <div class="chart-title"><span class="icon">📊</span> 负荷与出力趋势</div>
+      <div class="chart-container" id="chartLoad"></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span class="icon">💰</span> 分区电价走势</div>
+      <div class="chart-container" id="chartPrice"></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span class="icon">🌞</span> 新能源出力</div>
+      <div class="chart-container" id="chartRenewable"></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span class="icon">📈</span> 市场结算概览</div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>项目</th><th>数值</th><th>同比</th></tr></thead>
+          <tbody>
+            <tr><td>机制电量</td><td>9,600 MWh</td><td>↑ 3.5%</td></tr>
+            <tr><td>现货电量</td><td>2,400 MWh</td><td>↑ 8.2%</td></tr>
+            <tr><td>机制收益</td><td>¥4,800,000</td><td>↑ 2.1%</td></tr>
+            <tr><td>现货收益</td><td>¥384,567</td><td>↓ 5.3%</td></tr>
+            <tr><td>总收益</td><td>¥5,184,567</td><td>↑ 1.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span class="icon">📋</span> 价格统计</div>
+      <div class="chart-container" id="chartPriceStat"></div>
+    </div>
+  </div>
+  <div class="footer">数据更新时间：2026-05-26 17:00 | 运行日：2026-05-26</div>
+</div>
+<script>
+function initCharts() {
+  var hours = [];
+  for (var i = 0; i < 24; i++) hours.push(i + ':00');
+  
+  var loadChart = echarts.init(document.getElementById('chartLoad'), 'dark');
+  loadChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['统调负荷', '新能源', '火电', '水电'], top: 4, right: 12, textStyle: { color: '#999', fontSize: 11 } },
+    grid: { left: 55, right: 16, top: 36, bottom: 36 },
+    xAxis: { type: 'category', data: hours, axisLabel: { color: '#888', fontSize: 10 } },
+    yAxis: { type: 'value', name: 'MW', nameTextStyle: { color: '#888' } },
+    series: [
+      { name: '统调负荷', type: 'line', data: [38000,41000,43000,47000,45000,42000,39000,35000,33000,34000,36000,38000,39000,38000,37000,36000,37000,40000,44000,47000,45000,42000,40000,38000], smooth: true, symbol: 'none', lineStyle: { color: '#5a7aff', width: 2 }, areaStyle: { color: 'rgba(90,122,255,0.08)' } },
+      { name: '新能源', type: 'line', data: [4000,3800,3600,3500,5000,8000,11000,13000,12500,11000,9000,7000,6000,5500,5000,4500,4000,3800,3600,3500,3400,3300,3200,3100], smooth: true, symbol: 'none', lineStyle: { color: '#52c41a', width: 2 }, areaStyle: { color: 'rgba(82,196,26,0.08)' } },
+      { name: '火电', type: 'line', data: [28000,30000,32000,35000,33000,30000,28000,26000,24000,25000,27000,29000,30000,29000,28000,27000,28000,30000,33000,35000,34000,32000,30000,29000], smooth: true, symbol: 'none', lineStyle: { color: '#ff7043', width: 1.5 } },
+      { name: '水电', type: 'line', data: [2000,2000,2000,2100,2000,2000,1900,1800,1800,1800,1900,1900,2000,2000,2000,2000,2000,2100,2200,2100,2000,2000,2000,2000], smooth: true, symbol: 'none', lineStyle: { color: '#26c6da', width: 1.5 } }
+    ]
+  });
+  
+  var priceChart = echarts.init(document.getElementById('chartPrice'), 'dark');
+  priceChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['豫西', '豫中东', '豫南', '豫北'], top: 4, right: 12, textStyle: { color: '#999', fontSize: 11 } },
+    grid: { left: 55, right: 16, top: 36, bottom: 36 },
+    xAxis: { type: 'category', data: hours, axisLabel: { color: '#888', fontSize: 10 } },
+    yAxis: { type: 'value', name: '元/MWh', nameTextStyle: { color: '#888' } },
+    series: [
+      { name: '豫西', type: 'line', data: [130,110,90,80,95,120,150,180,190,170,140,120,110,100,95,90,85,100,140,190,160,130,110,100], smooth: true, symbol: 'none', lineStyle: { color: '#ff6b6b', width: 1.5 } },
+      { name: '豫中东', type: 'line', data: [140,120,100,90,105,130,160,190,200,180,150,130,120,110,105,100,95,110,150,200,170,140,120,110], smooth: true, symbol: 'none', lineStyle: { color: '#5a7aff', width: 1.5 } },
+      { name: '豫南', type: 'line', data: [135,115,95,85,100,125,155,185,195,175,145,125,115,105,100,95,90,105,145,195,165,135,115,105], smooth: true, symbol: 'none', lineStyle: { color: '#4ecdc4', width: 1.5 } },
+      { name: '豫北', type: 'line', data: [150,130,110,100,115,140,170,200,210,190,160,140,130,120,115,110,105,120,160,210,180,150,130,120], smooth: true, symbol: 'none', lineStyle: { color: '#ffa726', width: 1.5 } }
+    ]
+  });
+  
+  var renewableChart = echarts.init(document.getElementById('chartRenewable'), 'dark');
+  renewableChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['风电', '光伏'], top: 4, right: 12, textStyle: { color: '#999', fontSize: 11 } },
+    grid: { left: 55, right: 16, top: 36, bottom: 36 },
+    xAxis: { type: 'category', data: hours, axisLabel: { color: '#888', fontSize: 10 } },
+    yAxis: { type: 'value', name: 'MW', nameTextStyle: { color: '#888' } },
+    series: [
+      { name: '风电', type: 'line', data: [3500,3400,3300,3200,3100,2800,2200,1500,1000,800,700,650,600,550,500,480,450,480,600,1000,2000,2800,3200,3400], smooth: true, symbol: 'none', lineStyle: { color: '#4ecdc4', width: 2 }, areaStyle: { color: 'rgba(78,205,196,0.08)' } },
+      { name: '光伏', type: 'line', data: [500,400,300,300,1900,5200,8800,11500,11500,10200,8300,6350,5400,4950,4500,4020,3550,3320,3000,500,500,500,500,500], smooth: true, symbol: 'none', lineStyle: { color: '#ffa726', width: 2 }, areaStyle: { color: 'rgba(255,167,38,0.08)' } }
+    ]
+  });
+  
+  var priceStatChart = echarts.init(document.getElementById('chartPriceStat'), 'dark');
+  priceStatChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: 55, right: 16, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: ['最高', '最低', '平均'], axisLabel: { color: '#888', fontSize: 11 } },
+    yAxis: { type: 'value', name: '元/MWh', nameTextStyle: { color: '#888' } },
+    series: [
+      { type: 'bar', data: [285.22, 0, 90.89], barWidth: '50%', 
+        itemStyle: { color: ['#fc6161', '#52c41a', '#5a7aff'], borderRadius: [4,4,0,0] }
+      }
+    ]
+  });
+  
+  window.addEventListener('resize', function() {
+    loadChart.resize(); priceChart.resize(); renewableChart.resize(); priceStatChart.resize();
+  });
+}
+document.addEventListener('DOMContentLoaded', initCharts);
+</script>
+</body>
+</html>

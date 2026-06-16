@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电力交易辅助决策系统 - 方案三：现代简约风格</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #ffffff;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 64px;
+  height: 100vh;
+  background: #ffffff;
+  border-right: 1px solid #f0f0f0;
+  padding: 16px 0;
+  z-index: 200;
+}
+.sidebar .logo {
+  text-align: center;
+  padding: 8px 0 16px;
+  margin-bottom: 12px;
+}
+.sidebar .logo span { font-size: 24px; }
+.sidebar .menu-group {
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.sidebar .menu-title {
+  font-size: 9px;
+  color: #ccc;
+  padding: 8px 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.sidebar .menu-item {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: #999;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.sidebar .menu-item:hover { background: #f5f5f5; color: #666; }
+.sidebar .menu-item.active { background: #f0f5ff; color: #3b82f6; }
+.sidebar .menu-item .tooltip {
+  position: absolute;
+  left: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.sidebar .menu-item:hover .tooltip { opacity: 1; }
+.main-area { margin-left: 64px; }
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.header h1 { font-size: 24px; font-weight: 600; color: #1a1a1a; letter-spacing: -0.5px; }
+.header-controls { display: flex; align-items: center; gap: 16px; }
+.header-controls input[type="date"] {
+  background: transparent;
+  border: 1px solid #e0e0e0;
+  color: #333;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.header-controls .tag {
+  background: #f0f5ff;
+  color: #3b82f6;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 24px 32px;
+}
+.kpi-card {
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 20px 0;
+  border-bottom: 2px solid #f0f0f0;
+  transition: border-color 0.2s;
+}
+.kpi-card:hover { border-color: #3b82f6; }
+.kpi-card .label {
+  font-size: 12px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.kpi-card .value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+  letter-spacing: -1px;
+}
+.kpi-card .value.up { color: #ef4444; }
+.kpi-card .value.down { color: #22c55e; }
+.kpi-card .unit { font-size: 13px; color: #999; }
+.kpi-card .change {
+  font-size: 12px;
+  margin-top: 6px;
+}
+.kpi-card .change.positive { color: #22c55e; }
+.kpi-card .change.negative { color: #ef4444; }
+.section-wrap {
+  padding: 0 32px 32px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+.chart-panel {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.chart-panel.span-all { grid-column: 1 / -1; }
+.chart-panel .chart-title {
+  padding: 20px 24px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.chart-panel .chart-container { width: 100%; height: 320px; }
+.data-table-wrap { padding: 16px 24px; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  padding: 12px 0;
+  color: #999;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.data-table td {
+  padding: 14px 0;
+  border-bottom: 1px solid #f5f5f5;
+  color: #333;
+}
+.footer {
+  padding: 24px 32px;
+  font-size: 12px;
+  color: #ccc;
+}
+@media (max-width: 900px) {
+  .sidebar { width: 56px; }
+  .main-area { margin-left: 56px; }
+  .section-wrap { grid-template-columns: 1fr; }
+  .kpi-card { flex: 1 1 120px; }
+  .header { padding: 16px 20px; }
+  .kpi-row, .section-wrap { padding: 16px 20px; }
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo"><span>⚡</span></div>
+  <div class="menu-group">
+    <div class="menu-title">行情</div>
+    <button class="menu-item active" title="行情看板"><span>📊</span><span class="tooltip">行情看板</span></button>
+    <button class="menu-item" title="行情分析"><span>📈</span><span class="tooltip">行情分析</span></button>
+    <button class="menu-item" title="价差分析"><span>💰</span><span class="tooltip">价差分析</span></button>
+  </div>
+  <div class="menu-group">
+    <div class="menu-title">决策</div>
+    <button class="menu-item" title="现货决策"><span>⚡</span><span class="tooltip">现货决策</span></button>
+    <button class="menu-item" title="中长期"><span>📋</span><span class="tooltip">中长期管理</span></button>
+    <button class="menu-item" title="电价预测"><span>🔮</span><span class="tooltip">电价预测</span></button>
+  </div>
+  <div class="menu-group">
+    <div class="menu-title">结算</div>
+    <button class="menu-item" title="日结算"><span>📅</span><span class="tooltip">日结算</span></button>
+    <button class="menu-item" title="月结算"><span>📆</span><span class="tooltip">月结算</span></button>
+    <button class="menu-item" title="账单"><span>🧾</span><span class="tooltip">账单查询</span></button>
+  </div>
+  <div class="menu-group">
+    <div class="menu-title">数据</div>
+    <button class="menu-item" title="公有数据"><span>🌐</span><span class="tooltip">公有数据</span></button>
+    <button class="menu-item" title="私有数据"><span>🔒</span><span class="tooltip">私有数据</span></button>
+    <button class="menu-item" title="配置"><span>⚙️</span><span class="tooltip">系统配置</span></button>
+  </div>
+</div>
+<div class="main-area">
+  <div class="header">
+    <h1>Market Dashboard</h1>
+    <div class="header-controls">
+      <input type="date" value="2026-05-26">
+      <span class="tag">方案三：现代简约</span>
+    </div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">Max Load</div>
+      <div class="value up">47,165</div>
+      <div class="unit">MW</div>
+      <div class="change positive">+5.2%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg Load</div>
+      <div class="value">39,227</div>
+      <div class="unit">MW</div>
+      <div class="change positive">+2.1%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Max Price</div>
+      <div class="value up">285.22</div>
+      <div class="unit">¥/MWh</div>
+      <div class="change positive">+12.5%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg Price</div>
+      <div class="value">90.89</div>
+      <div class="unit">¥/MWh</div>
+      <div class="change negative">-3.2%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Renewable</div>
+      <div class="value">7,647</div>
+      <div class="unit">MW</div>
+      <div class="change positive">+8.3%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Contract Rate</div>
+      <div class="value">108%</div>
+      <div class="unit"></div>
+      <div class="change positive">达标</div>
+    </div>
+  </div>
+  <div class="section-wrap">
+    <div class="chart-panel span-all">
+      <div class="chart-title">Load & Generation Trend</div>
+      <div class="chart-container" id="chartLoad"></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title">Price Trend by Zone</div>
+      <div class="chart-container" id="chartPrice"></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title">Renewable Generation</div>
+      <div class="chart-container" id="chartRenewable"></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title">Settlement Overview</div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Item</th><th>Value</th><th>Change</th></tr></thead>
+          <tbody>
+            <tr><td>Mechanism Energy</td><td>9,600 MWh</td><td>+3.5%</td></tr>
+            <tr><td>Spot Energy</td><td>2,400 MWh</td><td>+8.2%</td></tr>
+            <tr><td>Mechanism Revenue</td><td>¥4,800,000</td><td>+2.1%</td></tr>
+            <tr><td>Spot Revenue</td><td>¥384,567</td><td>-5.3%</td></tr>
+            <tr><td>Total Revenue</td><td>¥5,184,567</td><td>+1.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title">Price Statistics</div>
+      <div class="chart-container" id="chartPriceStat"></div>
+    </div>
+  </div>
+  <div class="footer">Updated: May 26, 2026 17:00 | Operating Day: May 26, 2026</div>
+</div>
+<script>
+function initCharts() {
+  var hours = [];
+  for (var i = 0; i < 24; i++) hours.push(i + ':00');
+  
+  var loadChart = echarts.init(document.getElementById('chartLoad'));
+  loadChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['System Load', 'Renewable', 'Thermal', 'Hydro'], top: 4, right: 12, textStyle: { fontSize: 12 } },
+    grid: { left: 60, right: 20, top: 40, bottom: 40 },
+    xAxis: { type: 'category', data: hours, axisLabel: { fontSize: 11, color: '#999' }, axisLine: { lineStyle: { color: '#f0f0f0' } } },
+    yAxis: { type: 'value', name: 'MW', nameTextStyle: { color: '#999' }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#f5f5f5' } } },
+    series: [
+      { name: 'System Load', type: 'line', data: [38000,41000,43000,47000,45000,42000,39000,35000,33000,34000,36000,38000,39000,38000,37000,36000,37000,40000,44000,47000,45000,42000,40000,38000], smooth: true, symbol: 'none', lineStyle: { color: '#1a1a1a', width: 2 }, areaStyle: { color: 'rgba(26,26,26,0.03)' } },
+      { name: 'Renewable', type: 'line', data: [4000,3800,3600,3500,5000,8000,11000,13000,12500,11000,9000,7000,6000,5500,5000,4500,4000,3800,3600,3500,3400,3300,3200,3100], smooth: true, symbol: 'none', lineStyle: { color: '#3b82f6', width: 2 }, areaStyle: { color: 'rgba(59,130,246,0.05)' } },
+      { name: 'Thermal', type: 'line', data: [28000,30000,32000,35000,33000,30000,28000,26000,24000,25000,27000,29000,30000,29000,28000,27000,28000,30000,33000,35000,34000,32000,30000,29000], smooth: true, symbol: 'none', lineStyle: { color: '#666', width: 1.5 } },
+      { name: 'Hydro', type: 'line', data: [2000,2000,2000,2100,2000,2000,1900,1800,1800,1800,1900,1900,2000,2000,2000,2000,2000,2100,2200,2100,2000,2000,2000,2000], smooth: true, symbol: 'none', lineStyle: { color: '#999', width: 1.5 } }
+    ]
+  });
+  
+  var priceChart = echarts.init(document.getElementById('chartPrice'));
+  priceChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['West', 'Central', 'South', 'North'], top: 4, right: 12, textStyle: { fontSize: 11 } },
+    grid: { left: 55, right: 16, top: 36, bottom: 36 },
+    xAxis: { type: 'category', data: hours, axisLabel: { fontSize: 10, color: '#999' }, axisLine: { lineStyle: { color: '#f0f0f0' } } },
+    yAxis: { type: 'value', name: '¥/MWh', nameTextStyle: { color: '#999' }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#f5f5f5' } } },
+    series: [
+      { name: 'West', type: 'line', data: [130,110,90,80,95,120,150,180,190,170,140,120,110,100,95,90,85,100,140,190,160,130,110,100], smooth: true, symbol: 'none', lineStyle: { color: '#1a1a1a', width: 1.5 } },
+      { name: 'Central', type: 'line', data: [140,120,100,90,105,130,160,190,200,180,150,130,120,110,105,100,95,110,150,200,170,140,120,110], smooth: true, symbol: 'none', lineStyle: { color: '#3b82f6', width: 1.5 } },
+      { name: 'South', type: 'line', data: [135,115,95,85,100,125,155,185,195,175,145,125,115,105,100,95,90,105,145,195,165,135,115,105], smooth: true, symbol: 'none', lineStyle: { color: '#666', width: 1.5 } },
+      { name: 'North', type: 'line', data: [150,130,110,100,115,140,170,200,210,190,160,140,130,120,115,110,105,120,160,210,180,150,130,120], smooth: true, symbol: 'none', lineStyle: { color: '#999', width: 1.5 } }
+    ]
+  });
+  
+  var renewableChart = echarts.init(document.getElementById('chartRenewable'));
+  renewableChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['Wind', 'Solar'], top: 4, right: 12, textStyle: { fontSize: 11 } },
+    grid: { left: 55, right: 16, top: 36, bottom: 36 },
+    xAxis: { type: 'category', data: hours, axisLabel: { fontSize: 10, color: '#999' }, axisLine: { lineStyle: { color: '#f0f0f0' } } },
+    yAxis: { type: 'value', name: 'MW', nameTextStyle: { color: '#999' }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#f5f5f5' } } },
+    series: [
+      { name: 'Wind', type: 'line', data: [3500,3400,3300,3200,3100,2800,2200,1500,1000,800,700,650,600,550,500,480,450,480,600,1000,2000,2800,3200,3400], smooth: true, symbol: 'none', lineStyle: { color: '#3b82f6', width: 2 }, areaStyle: { color: 'rgba(59,130,246,0.05)' } },
+      { name: 'Solar', type: 'line', data: [500,400,300,300,1900,5200,8800,11500,11500,10200,8300,6350,5400,4950,4500,4020,3550,3320,3000,500,500,500,500,500], smooth: true, symbol: 'none', lineStyle: { color: '#f59e0b', width: 2 }, areaStyle: { color: 'rgba(245,158,11,0.05)' } }
+    ]
+  });
+  
+  var priceStatChart = echarts.init(document.getElementById('chartPriceStat'));
+  priceStatChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: 55, right: 16, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: ['Max', 'Min', 'Avg'], axisLabel: { fontSize: 11, color: '#999' }, axisLine: { lineStyle: { color: '#f0f0f0' } } },
+    yAxis: { type: 'value', name: '¥/MWh', nameTextStyle: { color: '#999' }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#f5f5f5' } } },
+    series: [
+      { type: 'bar', data: [285.22, 0, 90.89], barWidth: '40%', 
+        itemStyle: { color: ['#ef4444', '#22c55e', '#3b82f6'], borderRadius: [6,6,0,0] }
+      }
+    ]
+  });
+  
+  window.addEventListener('resize', function() {
+    loadChart.resize(); priceChart.resize(); renewableChart.resize(); priceStatChart.resize();
+  });
+}
+document.addEventListener('DOMContentLoaded', initCharts);
+</script>
+</body>
+</html>
