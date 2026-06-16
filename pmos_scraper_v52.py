@@ -16,11 +16,16 @@ from datetime import datetime, timedelta
 LOCAL_CHROME_DEBUG = "http://127.0.0.1:9222"
 
 # ============================================================
-# 模式配置（每种模式独立的 URL、Tab 关键词、跳过列表、输出前缀）
+# 模式配置（同一 URL + 页面内点击切换按钮）
+#   - switch_keyword: 进入页面后先点击哪个按钮切换模式（如"实际"/"预测"）
+#   - tab_keywords: 切换后匹配哪些数据 Tab
+#   - skip_tabs: 跳过哪些 Tab
+#   - xhr_export_tabs: 需要 XHR 导出 Excel 的 Tab
 # ============================================================
 MODE_CONFIG = {
     "actual": {
         "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/actual",
+        "switch_keyword": "实际",
         "tab_keywords": ["负荷", "联络线", "非现货", "新能源", "机组检修", "输变电", "备用", "断面", "必开", "电价"],
         "skip_tabs": {"实际变压器潮流息", "实际线路潮流"},
         "xhr_export_tabs": ["断面约束"],
@@ -28,7 +33,8 @@ MODE_CONFIG = {
         "label": "实际运行数据"
     },
     "forecast": {
-        "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/forecast",
+        "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/actual",
+        "switch_keyword": "预测",
         "tab_keywords": ["负荷", "联络线", "非现货", "新能源", "机组检修", "输变电", "备用", "断面", "必开", "电价", "调频", "调峰", "日前", "开停机"],
         "skip_tabs": set(),
         "xhr_export_tabs": ["断面约束"],
@@ -316,16 +322,48 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
     return all_data, total_rows
 
 
+def switch_mode_in_page(page, switch_keyword):
+    """在页面内查找并点击包含 switch_keyword 的切换按钮（实际/预测）
+    策略: 只看页面上 1/3 区域的元素，避免误匹配到数据 Tab
+    """
+    js = """() => {
+        const keyword = "__KW__";
+        const pageHeight = Math.max(document.documentElement.clientHeight || 600, 600);
+        const maxY = pageHeight / 3;
+        const candidates = [];
+        document.querySelectorAll('[class*="tab"], [class*="Tab"], [class*="button"], [class*="Button"], a, span, div').forEach(function(el) {
+            const text = (el.textContent || '').trim();
+            if (!text || text.length > 15) return;
+            if (!text.includes(keyword)) return;
+            const rect = el.getBoundingClientRect();
+            if (rect.width < 20 || rect.height < 20) return;
+            if (rect.top > maxY) return;
+            if (text.includes('变压器') || text.includes('线路') || text.includes('潮流') || text.includes('息')) return;
+            candidates.push({
+                text: text,
+                x: rect.left + rect.width/2,
+                y: rect.top + rect.height/2,
+                class: el.className ? String(el.className).substring(0, 60) : ''
+            });
+        });
+        candidates.sort(function(a, b) { return a.y - b.y; });
+        return candidates.length > 0 ? candidates[0] : null;
+    }""".replace("__KW__", switch_keyword)
+    return page.evaluate(js)
+
+
 def run_mode(mode, dates, browser):
     """运行单个模式（actual 或 forecast）"""
     cfg = MODE_CONFIG[mode]
     url = cfg['url']
     tab_keywords = cfg['tab_keywords']
     output_prefix = cfg['output_prefix']
+    switch_kw = cfg['switch_keyword']
 
     print(f"\n{'#'*60}")
     print(f"# 🎯 模式: {mode} ({cfg['label']})")
     print(f"# 🌐 URL: {url}")
+    print(f"# 🔀 页面内切换: 点击含\"{switch_kw}\"")
     print(f"{'#'*60}")
 
     context = browser.contexts[0]
@@ -334,6 +372,17 @@ def run_mode(mode, dates, browser):
     print(f"\n🌐 打开数据页面...")
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     time.sleep(5)
+
+    # 页面内切换到 actual/forecast
+    if switch_kw:
+        print(f"\n🔀 在页面内查找并点击\"{switch_kw}\"按钮...")
+        sw_el = switch_mode_in_page(page, switch_kw)
+        if sw_el:
+            print(f"   找到: {sw_el.get('text')} ({sw_el.get('class','')})")
+            page.mouse.click(sw_el['x'], sw_el['y'])
+            time.sleep(3)
+        else:
+            print(f"   ⚠️ 未找到\"{switch_kw}\"切换按钮（可能已在正确页面）")
 
     print("\n🔘 获取 Tab...")
     tabs = page.evaluate("""() => {
