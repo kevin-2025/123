@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电力交易辅助决策系统 - 统一看板预览</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0e1a;
+  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", "Segoe UI", sans-serif;
+  min-height: 100vh;
+  padding-bottom: 40px;
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 48px;
+  height: 100vh;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  gap: 4px;
+  z-index: 200;
+}
+.sidebar .s-item {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+  position: relative;
+}
+.sidebar .s-item:hover {
+  background: rgba(90,122,255,0.12);
+  border-color: rgba(90,122,255,0.2);
+}
+.sidebar .s-item.active {
+  background: rgba(90,122,255,0.2);
+  border-color: rgba(90,122,255,0.3);
+  box-shadow: 0 0 8px rgba(90,122,255,0.1);
+}
+.sidebar .s-item .tooltip {
+  position: absolute;
+  left: 48px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(20, 28, 52, 0.95);
+  color: #bcc;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar .s-item:hover .tooltip { opacity: 1; }
+.sidebar .s-divider {
+  width: 24px;
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 4px 0;
+}
+
+/* ===== Main Content Offset ===== */
+.main-area {
+  margin-left: 48px;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 16px 20px;
+  background: rgba(15, 20, 35, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-wrap: wrap;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #e8e8ff;
+  letter-spacing: 1px;
+}
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-controls input[type="date"] {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+}
+.header-controls input[type="date"]:focus { border-color: #5a7aff; }
+.header-controls .btn-primary {
+  background: linear-gradient(135deg, #5a7aff 0%, #7c5cfc 100%);
+  color: #fff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+.header-controls .btn-primary:hover { opacity: 0.85; }
+.header-controls .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.header-controls .btn-ghost {
+  background: transparent;
+  color: #8888aa;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.header-controls .btn-ghost:hover {
+  background: rgba(255,255,255,0.04);
+  color: #bcc;
+  border-color: rgba(255,255,255,0.15);
+}
+.loading-indicator {
+  display: none;
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top: 2px solid #5a7aff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== KPI ===== */
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 20px;
+}
+.kpi-card {
+  flex: 1 1 120px;
+  min-width: 100px;
+  background: rgba(15, 20, 35, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.kpi-card .label {
+  font-size: 10px;
+  color: #8888aa;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.kpi-card .value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #e8e8ff;
+}
+.kpi-card .value.val-up { color: #fc6161; }
+.kpi-card .value.val-down { color: #52c41a; }
+.kpi-card .unit {
+  font-size: 10px;
+  color: #8888aa;
+  margin-left: 2px;
+}
+
+/* ===== Grid Layout ===== */
+.section-wrap {
+  padding: 0 20px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.chart-panel {
+  background: rgba(15, 20, 35, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.chart-panel.span-all { grid-column: 1 / -1; }
+.chart-panel .chart-title {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #bcc;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chart-panel .chart-title .title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-panel .chart-title .title-icon { font-size: 15px; }
+.chart-panel .chart-container {
+  width: 100%;
+  height: 280px;
+}
+.chart-panel .chart-status {
+  display: none;
+  height: 280px;
+  align-items: center;
+  justify-content: center;
+  color: #ff6b6b;
+  font-size: 13px;
+}
+.chart-panel .chart-empty {
+  display: none;
+  height: 280px;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 13px;
+}
+/* Heatmap collapsible */
+#panelHeatmap .chart-container {
+  height: auto;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+#panelHeatmap .chart-container.expanded { max-height: 800px; }
+#heatmapWrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+}
+#heatmapCanvas { display: block; }
+.heatmap-toggle {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #8888aa;
+  padding: 2px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+.heatmap-toggle:hover {
+  background: rgba(90,122,255,0.1);
+  color: #bcc;
+}
+
+/* ===== TAB panel ===== */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.015);
+}
+.tab-bar .tab-item {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #888;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tab-bar .tab-item:hover { color: #bcc; background: rgba(255,255,255,0.02); }
+.tab-bar .tab-item.active {
+  color: #8aa4ff;
+  border-bottom-color: #5a7aff;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.tab-content .data-table-wrap {
+  padding: 12px 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.tab-content .chart-container {
+  width: 100%;
+  height: 260px;
+}
+.tab-content .chart-status {
+  display: none;
+  height: 260px;
+  align-items: center;
+  justify-content: center;
+  color: #ff6b6b;
+  font-size: 13px;
+}
+.tab-content .chart-empty {
+  display: none;
+  height: 260px;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 13px;
+}
+
+/* ===== Data Table ===== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table th {
+  text-align: left;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.04);
+  color: #999;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky;
+  top: 0;
+}
+.data-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: #ccc;
+}
+
+/* ===== Heatmap tooltip ===== */
+.heatmap-tooltip {
+  position: fixed;
+  background: rgba(0,0,0,0.9);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  pointer-events: none;
+  display: none;
+  z-index: 999;
+  white-space: nowrap;
+}
+
+/* ===== Footer ===== */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px 0;
+  font-size: 11px;
+  color: #555;
+}
+.footer .stat-item {
+  background: rgba(15, 20, 35, 0.5);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .section-wrap { grid-template-columns: 1fr; }
+  .sidebar { width: 40px; }
+  .main-area { margin-left: 40px; }
+  .sidebar .s-item { width: 30px; height: 30px; font-size: 14px; }
+  .kpi-card { flex: 1 1 80px; min-width: 70px; }
+  .kpi-card .value { font-size: 16px; }
+  .header h1 { font-size: 16px; }
+}
+
+/* ===== Unified module switch preview overrides ===== */
+.sidebar {
+  width: 188px;
+  align-items: stretch;
+  padding: 14px 10px;
+  gap: 10px;
+}
+.main-area { margin-left: 188px; }
+.module-side-title {
+  color: #7f8ca8;
+  font-size: 12px;
+  padding: 4px 8px 8px;
+  line-height: 1.5;
+}
+.module-side-btn {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.045);
+  color: #b9c5df;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all .15s;
+}
+.module-side-btn:hover {
+  background: rgba(90,122,255,0.12);
+  border-color: rgba(90,122,255,0.22);
+}
+.module-side-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(91,138,247,.32), rgba(78,205,196,.20));
+  border-color: rgba(91,138,247,.45);
+  box-shadow: 0 0 16px rgba(91,138,247,.12);
+}
+.module-side-btn .emoji { font-size: 17px; }
+.module-side-btn .txt { display: flex; flex-direction: column; gap: 2px; }
+.module-side-btn .txt small { color: #74819c; font-size: 10px; }
+.preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #8fa2d8;
+  border: 1px solid rgba(143,162,216,.18);
+  background: rgba(143,162,216,.08);
+  border-radius: 999px;
+  padding: 4px 8px;
+  margin-left: 8px;
+}
+@media (max-width: 900px) {
+  .sidebar { width: 128px; padding: 10px 6px; }
+  .main-area { margin-left: 128px; }
+  .module-side-btn { font-size: 12px; padding: 7px; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar">
+  <div class="module-side-title">模块切换</div>
+  <button class="module-side-btn active" id="btnActual" onclick="switchModule('actual')">
+    <span class="emoji">📊</span><span class="txt">电网实际运行信息</span>
+  </button>
+  <button class="module-side-btn" id="btnForecast" onclick="switchModule('forecast')">
+    <span class="emoji">📈</span><span class="txt">电网运行预测信息</span>
+  </button>
+  <div class="s-divider" style="width:100%;margin:6px 0;"></div>
+  <div class="section-nav-title" style="color:#7f8ca8;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;padding:4px 8px 8px;">本页导航</div>
+  <div id="sectionNavContainer"></div>
+</div>
+
+<div class="main-area">
+
+  <div class="header">
+    <h1>电力交易辅助决策系统</h1>
+    <div class="header-controls">
+      <div class="loading-indicator" id="loadingSpinner" style="display:none;"></div>
+    </div>
+  </div>
+
+  <div class="module-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;">
+    <h2 id="moduleTitle" style="margin:0;font-size:16px;font-weight:600;color:#e8e8ff;">电网实际运行信息</h2>
+    <div class="module-date-controls" style="display:flex;align-items:center;gap:8px;">
+      <button class="btn-ghost" style="background:transparent;color:#8888aa;border:1px solid rgba(255,255,255,0.1);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;" onclick="changeDate(-1)" title="前一天">◀</button>
+      <input type="date" id="datePicker" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e0e0e0;padding:6px 10px;border-radius:8px;font-size:13px;outline:none;font-family:inherit;" onchange="onDateChange()" />
+      <button class="btn-ghost" style="background:transparent;color:#8888aa;border:1px solid rgba(255,255,255,0.1);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;" onclick="changeDate(1)" title="后一天">▶</button>
+    </div>
+  </div>
+
+  <div class="kpi-row" id="kpiRow">
+    <div class="kpi-card"><div class="label">最大负荷</div><div class="value" id="kpiMaxLoad">--</div></div>
+    <div class="kpi-card"><div class="label">最小负荷</div><div class="value" id="kpiMinLoad">--</div></div>
+    <div class="kpi-card"><div class="label">平均负荷</div><div class="value" id="kpiAvgLoad">--</div></div>
+    <div class="kpi-card"><div class="label">最高电价</div><div class="value" id="kpiMaxPrice">--</div></div>
+    <div class="kpi-card"><div class="label">最低电价</div><div class="value" id="kpiMinPrice">--</div></div>
+    <div class="kpi-card"><div class="label">均价</div><div class="value" id="kpiAvgPrice">--</div></div>
+  </div>
+
+  <div class="section-wrap">
+
+    <!-- 1. Load (span-all) -->
+    <div class="chart-panel span-all" id="s-load">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">📊</span> 负荷信息</span><span style="font-size:10px;color:#555;">统调 · 总出力 · 联络线 · 非现货 · 新能源 · 水电 · 抽蓄</span></div>
+      <div class="chart-container" id="chartLoad"></div>
+      <div class="chart-status" id="errLoad">数据加载失败</div>
+    </div>
+
+    <!-- 2. Renewable -->
+    <div class="chart-panel" id="s-renewable">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">🌞</span> 新能源出力</span></div>
+      <div class="chart-container" id="chartRenewable"></div>
+      <div class="chart-status" id="errRenewable">数据加载失败</div>
+    </div>
+
+    <!-- 3. Price -->
+    <div class="chart-panel" id="s-price">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">💰</span> 实时出清电价</span></div>
+      <div class="chart-container" id="chartPrice"></div>
+      <div class="chart-status" id="errPrice">数据加载失败</div>
+    </div>
+
+    <!-- 4. Non-spot -->
+    <div class="chart-panel" id="s-nonspot">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">🔌</span> 非现货机组出力</span></div>
+      <div class="chart-container" id="chartNonSpot"></div>
+      <div class="chart-status" id="errNonSpot">数据加载失败</div>
+    </div>
+
+    <!-- 5. Tie-line -->
+    <div class="chart-panel" id="s-tieline">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">🔗</span> 联络线计划</span></div>
+      <div class="chart-container" id="chartTieLine"></div>
+      <div class="chart-status" id="errTieLine">数据加载失败</div>
+    </div>
+
+    <!-- 6. Heatmap (collapsible) -->
+    <div class="chart-panel span-all" id="s-heatmap">
+      <div class="chart-title">
+        <span class="title-left"><span class="title-icon">📐</span> 断面约束</span>
+        <span><button class="heatmap-toggle" id="heatmapToggle" onclick="toggleHeatmap()">▼ 展开查看</button></span>
+      </div>
+      <div id="panelHeatmap">
+        <div class="chart-container" id="heatmapContainer">
+          <div id="heatmapWrap"><canvas id="heatmapCanvas"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-status" id="errHeatmap" style="height:200px;">数据加载失败</div>
+    </div>
+
+    <!-- 7. Reserve -->
+    <div class="chart-panel" id="s-reserve">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">🔄</span> 备用信息</span></div>
+      <div class="chart-container" id="chartReserve"></div>
+      <div class="chart-status" id="errReserve">数据加载失败</div>
+    </div>
+
+    <!-- 8-10. TAB panel -->
+    <div class="chart-panel" id="s-unit">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">📋</span> 机组信息</span></div>
+      <div class="tab-bar">
+        <div class="tab-item active" data-tab="mandplan" onclick="switchTab('mandplan')">必开必停</div>
+        <div class="tab-item" data-tab="maintenance" onclick="switchTab('maintenance')">机组检修</div>
+        <div class="tab-item" data-tab="trans" onclick="switchTab('trans')">输变电检修</div>
+      </div>
+      <div class="tab-content active" id="tab-mandplan">
+        <div id="mandPlanWrap" class="data-table-wrap"></div>
+        <div class="chart-empty" id="emptyMandPlan">暂无必开必停机组信息</div>
+      </div>
+      <div class="tab-content" id="tab-maintenance">
+        <div class="chart-container" id="chartMaintenance"></div>
+        <div class="chart-status" id="errMaintenance">数据加载失败</div>
+      </div>
+      <div class="tab-content" id="tab-trans">
+        <div id="transWrap" class="data-table-wrap"></div>
+        <div class="chart-empty" id="emptyTrans">暂无输变电检修信息</div>
+      </div>
+    </div>
+
+    <!-- 11. Transformer Flow -->
+    <div class="chart-panel" id="s-transformer">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">⚡</span> 实际变压器潮流息</span></div>
+      <div class="chart-container" id="chartTransformer"></div>
+      <div class="chart-status" id="errTransformer">数据加载失败</div>
+    </div>
+
+    <!-- 12. Line Flow -->
+    <div class="chart-panel" id="s-line">
+      <div class="chart-title"><span class="title-left"><span class="title-icon">🔌</span> 实际线路潮流</span></div>
+      <div class="chart-container" id="chartLine"></div>
+      <div class="chart-status" id="errLine">数据加载失败</div>
+    </div>
+
+  </div>
+
+  <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+  <div class="footer" id="footerInfo">正在加载统计信息...</div>
+
+</div>
+
+<script>
+var BASE = '';
+var currentDate = '';
+var currentModule = 'actual';
+var debounceTimer = null;
+
+var chartLoad = null, chartRenewable = null, chartPrice = null;
+var chartNonSpot = null, chartTieLine = null;
+var chartReserve = null, chartMaintenance = null;
+var chartTransformer = null, chartLine = null;
+
+var cachedData = {};
+
+function $(id) { return document.getElementById(id); }
+function showLoading() {
+  var s = $('loadingSpinner');
+  if (s) s.style.display = 'block';
+}
+function hideLoading() {
+  var s = $('loadingSpinner');
+  if (s) s.style.display = 'none';
+}
+
+function formatNum(v, unit) {
+  if (v == null || v === '') return '--';
+  var n = Number(v);
+  if (!Number.isFinite(n)) return '--';
+  return n.toFixed(2) + (unit ? ' <span class="unit">' + unit + '</span>' : '');
+}
+
+function sparseLabels(labels) {
+  return labels.map(function(l, i) { return (i % 4 === 0) ? l : ''; });
+}
+
+function updateKPI(id, val, unit) {
+  var el = $(id);
+  if (!el) return;
+  if (val == null || !Number.isFinite(Number(val))) {
+    el.innerHTML = '--'; el.className = 'value'; return;
+  }
+  var n = Number(val);
+  el.innerHTML = n.toFixed(2) + (unit ? ' <span class="unit">' + unit + '</span>' : '');
+  var cls = 'value';
+  if (id === 'kpiMaxPrice') cls += ' val-up';
+  if (id === 'kpiMinPrice') cls += ' val-down';
+  if (id === 'kpiMaxLoad') cls += ' val-up';
+  if (id === 'kpiMinLoad') cls += ' val-down';
+  el.className = cls;
+}
+
+function initSidebar() {
+  // 左侧当前只做实际/预测模块切换；原小图标快速定位先去掉，后续再考虑添加。
+  updateModuleUI();
+}
+
+var heatmapExpanded = false;
+function toggleHeatmap() {
+  heatmapExpanded = !heatmapExpanded;
+  $('heatmapContainer').classList.toggle('expanded', heatmapExpanded);
+  $('heatmapToggle').textContent = heatmapExpanded ? '▲ 收起' : '▼ 展开查看';
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-item').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelector('.tab-item[data-tab="' + name + '"]').classList.add('active');
+  $('tab-' + name).classList.add('active');
+  if (name === 'maintenance' && chartMaintenance) setTimeout(function() { chartMaintenance.resize(); }, 100);
+}
+
+function exportCSV() {
+  var keys = Object.keys(cachedData);
+  if (keys.length === 0) { alert('暂无数据可导出'); return; }
+  var lines = ['# 河南电力现货市场行情 - ' + currentDate, '# 导出时间: ' + new Date().toLocaleString('zh-CN'), ''];
+  keys.forEach(function(key) {
+    var d = cachedData[key];
+    if (!d || d.length === 0) return;
+    lines.push('# ' + key);
+    var headers = Object.keys(d[0]);
+    lines.push(headers.join(','));
+    d.forEach(function(row) {
+      lines.push(headers.map(function(h) {
+        var v = row[h];
+        if (v == null) return '';
+        return String(v).includes(',') ? '"' + String(v).replace(/"/g,'""') + '"' : String(v);
+      }).join(','));
+    });
+    lines.push('');
+  });
+  var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'henan_power_' + currentDate + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+function initCharts() {
+  var els = ['chartLoad','chartRenewable','chartPrice','chartNonSpot','chartTieLine','chartReserve','chartMaintenance','chartTransformer','chartLine'];
+  var instances = {};
+  els.forEach(function(id) {
+    var dom = $(id);
+    if (!dom) return;
+    instances[id] = echarts.init(dom, 'dark');
+  });
+  chartLoad = instances.chartLoad; chartRenewable = instances.chartRenewable;
+  chartPrice = instances.chartPrice; chartNonSpot = instances.chartNonSpot;
+  chartTieLine = instances.chartTieLine; chartReserve = instances.chartReserve;
+  chartMaintenance = instances.chartMaintenance;
+  chartTransformer = instances.chartTransformer; chartLine = instances.chartLine;
+  window.addEventListener('resize', function() {
+    [chartLoad, chartRenewable, chartPrice, chartNonSpot, chartTieLine, chartReserve, chartMaintenance, chartTransformer, chartLine]
+      .forEach(function(c) { c && c.resize(); });
+  });
+}
+
+function makeLineOption(labels, seriesArr, yName, opts) {
+  opts = opts || {};
+  var tooltipCfg = { trigger: 'axis' };
+  if (opts.tooltipFormatter) tooltipCfg.formatter = opts.tooltipFormatter;
+  return {
+    tooltip: tooltipCfg,
+    legend: { data: seriesArr.map(function(s) { return s.name; }), top: 4, right: 12, textStyle: { color: '#999', fontSize: 10 } },
+    grid: { left: 55, right: 16, top: 34, bottom: 36 },
+    xAxis: { type: 'category', data: sparseLabels(labels), axisLabel: { rotate: 45, fontSize: 10, color: '#8888aa' } },
+    yAxis: { type: 'value', name: yName || 'MW', nameTextStyle: { color: '#8888aa' } },
+    series: seriesArr
+  };
+}
+
+function renderChart(inst, errId, labels, seriesArr, yName, opts) {
+  if (!inst) return;
+  $(errId).style.display = 'none';
+  inst.getDom().style.display = '';
+  inst.setOption(makeLineOption(labels, seriesArr, yName, opts));
+}
+
+function showErr(errId, chartVar) {
+  if (chartVar && window[chartVar]) {
+    var dom = window[chartVar].getDom();
+    if (dom) dom.style.display = 'none';
+  }
+  var el = $(errId);
+  if (el) el.style.display = 'flex';
+}
+
+var HM_TIMES = ["00:15","00:30","00:45","01:00","01:15","01:30","01:45","02:00","02:15","02:30","02:45","03:00","03:15","03:30","03:45","04:00","04:15","04:30","04:45","05:00","05:15","05:30","05:45","06:00","06:15","06:30","06:45","07:00","07:15","07:30","07:45","08:00","08:15","08:30","08:45","09:00","09:15","09:30","09:45","10:00","10:15","10:30","10:45","11:00","11:15","11:30","11:45","12:00","12:15","12:30","12:45","13:00","13:15","13:30","13:45","14:00","14:15","14:30","14:45","15:00","15:15","15:30","15:45","16:00","16:15","16:30","16:45","17:00","17:15","17:30","17:45","18:00","18:15","18:30","18:45","19:00","19:15","19:30","19:45","20:00","20:15","20:30","20:45","21:00","21:15","21:30","21:45","22:00","22:15","22:30","22:45","23:00","23:15","23:30","23:45","24:00"];
+
+function getHeatColor(val, vmin, vmax) {
+  if (isNaN(val)) return '#0a0e1a';
+  var mid = (vmin + vmax) / 2;
+  var t, r, g, b;
+  if (val <= mid) {
+    t = (val - vmin) / ((mid - vmin) || 1);
+    r = Math.round(41 + t * 214); g = Math.round(98 + t * 157); b = Math.round(255 - t * 106);
+  } else {
+    t = (val - mid) / ((vmax - mid) || 1);
+    r = Math.round(255 - t * 90); g = Math.round(255 - t * 255); b = Math.round(255 - t * 217);
+  }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+function renderHeatmap(data) {
+  var canvas = $('heatmapCanvas');
+  var errEl = $('errHeatmap');
+  if (!canvas || !data || data.length === 0) { if (errEl) errEl.style.display = 'flex'; return; }
+  if (errEl) errEl.style.display = 'none';
+  canvas.style.display = '';
+
+  var TIMES = HM_TIMES, H_CELL = 18, LABEL_W = 320, PAD = 20;
+  var containerW = $('heatmapWrap').clientWidth;
+  if (containerW < 400) containerW = 400;
+  var CELL_W = Math.max(4, Math.floor((containerW - LABEL_W - PAD * 2) / 96));
+
+  var rows = [], allVals = [];
+  for (var i = 0; i < data.length; i++) {
+    var s = data[i], vals = [];
+    for (var j = 0; j < s.values.length; j++) {
+      var v = s.values[j];
+      if (v !== null && !isNaN(v)) { vals.push(v); allVals.push(v); } else vals.push(NaN);
+    }
+    rows.push({ name: s.name, values: vals });
+  }
+  if (rows.length === 0) { $('errHeatmap').style.display = 'flex'; return; }
+
+  var vmin = Infinity, vmax = -Infinity;
+  for (var k = 0; k < allVals.length; k++) {
+    if (allVals[k] < vmin) vmin = allVals[k];
+    if (allVals[k] > vmax) vmax = allVals[k];
+  }
+
+  var dpr = window.devicePixelRatio || 1;
+  var w = LABEL_W + PAD + TIMES.length * CELL_W + PAD;
+  var h = rows.length * H_CELL + PAD + 40;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#0a0e1a'; ctx.fillRect(0, 0, w, h);
+  var x0 = LABEL_W + PAD, y0 = PAD;
+  for (var ri = 0; ri < rows.length; ri++) {
+    for (var ci = 0; ci < TIMES.length; ci++) {
+      ctx.fillStyle = getHeatColor(rows[ri].values[ci], vmin, vmax);
+      ctx.fillRect(x0 + ci * CELL_W, y0 + ri * H_CELL, CELL_W - 0.5, H_CELL - 0.5);
+    }
+  }
+  ctx.fillStyle = '#aaa'; ctx.font = '11px "Microsoft YaHei", sans-serif'; ctx.textAlign = 'right';
+  for (var ri = 0; ri < rows.length; ri++) {
+    var txt = rows[ri].name;
+    ctx.fillText(txt.length > 45 ? txt.substring(0,45)+'\u2026' : txt, x0 - 8, y0 + ri * H_CELL + 13, LABEL_W - 10);
+  }
+  ctx.textAlign = 'start';
+  ctx.fillStyle = '#888'; ctx.font = '9px "Microsoft YaHei", sans-serif';
+  ctx.save(); ctx.translate(x0 + 4, h - 6); ctx.rotate(-Math.PI / 4);
+  for (var ci = 0; ci < TIMES.length; ci += 4) ctx.fillText(TIMES[ci], ci * CELL_W, 0);
+  ctx.restore();
+
+  // Legend bar
+  var lgX = x0, lgY = y0 + rows.length * H_CELL + 14, lgW = TIMES.length * CELL_W;
+  for (var i = 0; i < lgW; i++) {
+    ctx.fillStyle = getHeatColor(vmin + (i/lgW)*(vmax-vmin), vmin, vmax);
+    ctx.fillRect(lgX + i, lgY, 1, 10);
+  }
+  ctx.fillStyle = '#888'; ctx.font = '10px sans-serif'; ctx.textAlign = 'start';
+  ctx.fillText(Math.round(vmin) + ' MW', lgX, lgY + 22);
+  ctx.textAlign = 'end'; ctx.fillText(Math.round(vmax) + ' MW', lgX + lgW, lgY + 22);
+
+  // Tooltip
+  var tip = $('heatmapTooltip');
+  canvas.onmousemove = function(e) {
+    var rect = canvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    var ci = Math.floor((mx - x0) / CELL_W), ri = Math.floor((my - y0) / H_CELL);
+    if (ci >= 0 && ci < TIMES.length && ri >= 0 && ri < rows.length) {
+      var val = rows[ri].values[ci];
+      tip.style.display = 'block'; tip.style.left = (e.clientX + 15) + 'px'; tip.style.top = (e.clientY - 40) + 'px';
+      tip.textContent = rows[ri].name + ' | ' + TIMES[ci] + ' | ' + (isNaN(val) ? '-' : Math.round(val) + ' MW');
+    } else { tip.style.display = 'none'; }
+  };
+  canvas.onmouseleave = function() { tip.style.display = 'none'; };
+  
+  // 确保错误提示被隐藏
+  var errEl = $('errHeatmap');
+  if (errEl) errEl.style.display = 'none';
+}
+
+function renderTable(wrapId, emptyId, data, columns) {
+  var wrap = $(wrapId), empty = $(emptyId);
+  if (!data || data.length === 0) { wrap.innerHTML = ''; empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+  var html = '<table class="data-table"><thead><tr>';
+  for (var c = 0; c < columns.length; c++) html += '<th>' + columns[c].label + '</th>';
+  html += '</tr></thead><tbody>';
+  for (var r = 0; r < data.length; r++) {
+    html += '<tr>';
+    for (var c = 0; c < columns.length; c++) html += '<td>' + (data[r][columns[c].key] != null ? data[r][columns[c].key] : '-') + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+
+function switchModule(moduleKey) {
+  if (moduleKey === currentModule) return;
+  currentModule = moduleKey;
+  updateModuleUI();
+  updateUrlState();
+  refresh();
+}
+
+function renderSectionNav(isForecast) {
+  var container = $('sectionNavContainer');
+  if (!container) return;
+  var sections = isForecast ? [
+    { id: 's-load', icon: '📊', label: '负荷预测' },
+    { id: 's-renewable', icon: '🌞', label: '新能源出力预测' },
+    { id: 's-price', icon: '💰', label: '电价预测' },
+    { id: 's-nonspot', icon: '🔌', label: '非现货出力预测' },
+    { id: 's-tieline', icon: '🔗', label: '联络线预测' },
+    { id: 's-reserve', icon: '🔄', label: '备用预测' },
+    { id: 's-heatmap', icon: '📐', label: '断面预测' },
+    { id: 's-unit', icon: '📋', label: '机组检修预测' }
+  ] : [
+    { id: 's-load', icon: '📊', label: '负荷信息' },
+    { id: 's-renewable', icon: '🌞', label: '新能源出力' },
+    { id: 's-price', icon: '💰', label: '实时电价' },
+    { id: 's-nonspot', icon: '🔌', label: '非现货机组' },
+    { id: 's-tieline', icon: '🔗', label: '联络线计划' },
+    { id: 's-reserve', icon: '🔄', label: '备用信息' },
+    { id: 's-heatmap', icon: '📐', label: '断面约束' },
+    { id: 's-unit', icon: '📋', label: '机组信息' }
+  ];
+  container.innerHTML = '';
+  sections.forEach(function(sec) {
+    var btn = document.createElement('button');
+    btn.className = 'section-nav-item';
+    btn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:12px;color:#888;cursor:pointer;border-left:2px solid transparent;transition:all .15s;font-family:inherit;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left;border-radius:4px;';
+    btn.dataset.target = sec.id;
+    btn.innerHTML = '<span class="icon" style="font-size:14px;">' + sec.icon + '</span> ' + sec.label;
+    btn.onclick = function() { var el = $(sec.id); if (el) { var yOffset = -120; var y = el.getBoundingClientRect().top + window.pageYOffset + yOffset; window.scrollTo({ top: y, behavior: 'smooth' }); } };
+    container.appendChild(btn);
+  });
+  initSectionObserver();
+}
+
+function initSectionObserver() {
+  var items = document.querySelectorAll('.section-nav-item');
+  var map = {};
+  items.forEach(function(el) { map[el.dataset.target] = el; });
+  if (typeof window.sectionObserver !== 'undefined') window.sectionObserver.disconnect();
+  window.sectionObserver = new IntersectionObserver(function(entries) {
+    var visible = entries.filter(function(e) { return e.isIntersecting; }).sort(function(a, b) { return b.intersectionRatio - a.intersectionRatio; });
+    if (visible.length > 0) {
+      items.forEach(function(el) { el.classList.remove('active'); el.style.color = '#888'; el.style.borderLeftColor = 'transparent'; el.style.background = 'none'; });
+      var target = map[visible[0].target.id];
+      if (target) { target.classList.add('active'); target.style.color = '#8aa4ff'; target.style.borderLeftColor = '#5a7aff'; target.style.background = 'rgba(90,122,255,0.08)'; }
+    }
+  }, { threshold: [0.1, 0.3, 0.5], rootMargin: '0px 0px -100px 0px' });
+  items.forEach(function(el) { var target = document.getElementById(el.dataset.target); if (target) window.sectionObserver.observe(target); });
+}
+
+function updateModuleUI() {
+  var isForecast = currentModule === 'forecast';
+  if ($('btnActual')) $('btnActual').classList.toggle('active', !isForecast);
+  if ($('btnForecast')) $('btnForecast').classList.toggle('active', isForecast);
+  if ($('moduleTitle')) $('moduleTitle').textContent = isForecast ? '电网运行预测信息' : '电网实际运行信息';
+  renderSectionNav(isForecast);
+  var priceTitle = document.querySelector('#s-price .title-left');
+  if (priceTitle) priceTitle.innerHTML = '<span class="title-icon">💰</span> ' + (isForecast ? '日前出清电价' : '实时出清电价');
+  var transformerTitle = document.querySelector('#s-transformer .title-left');
+  if (transformerTitle) transformerTitle.innerHTML = '<span class="title-icon">' + (isForecast ? '📡' : '⚡') + '</span> ' + (isForecast ? '调频需求' : '实际变压器潮流息');
+  var lineTitle = document.querySelector('#s-line .title-left');
+  if (lineTitle) lineTitle.innerHTML = '<span class="title-icon">' + (isForecast ? '🧾' : '🔌') + '</span> ' + (isForecast ? '日前线路传输限额' : '实际线路潮流');
+}
+
+function updateUrlState() {
+  var url = new URL(window.location.href);
+  url.searchParams.set('module', currentModule);
+  if (currentDate) url.searchParams.set('date', currentDate);
+  history.replaceState(null, '', url.toString());
+}
+
+function changeDate(delta) {
+  var dp = $('datePicker');
+  var d = new Date(dp.value + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  dp.value = d.toISOString().split('T')[0];
+  onDateChange();
+}
+
+function onDateChange() {
+  currentDate = $('datePicker').value;
+  updateUrlState();
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(refresh, 300);
+}
+
+function readUrlState() {
+  var url = new URL(window.location.href);
+  var module = url.searchParams.get('module');
+  if (module === 'forecast' || module === 'actual') currentModule = module;
+  var date = url.searchParams.get('date');
+  if (date) currentDate = date;
+}
+
+function getApiUrls(date) {
+  if (currentModule === 'forecast') {
+    return [
+      BASE + '/api/forecast/stats?date=' + date,
+      BASE + '/api/forecast/load-info?date=' + date,
+      BASE + '/api/forecast/renewable-generation?date=' + date,
+      BASE + '/api/forecast/day-ahead-price?date=' + date,
+      BASE + '/api/forecast/non-spot-generation?date=' + date,
+      BASE + '/api/forecast/tie-line-plan?date=' + date,
+      BASE + '/api/forecast/section-data?date=' + date + '&limit=100000',
+      BASE + '/api/forecast/reserve-info?date=' + date,
+      BASE + '/api/forecast/unit-mandatory-plan?date=' + date,
+      BASE + '/api/forecast/unit-maintenance?date=' + date,
+      BASE + '/api/forecast/transmission-maintenance?date=' + date,
+      BASE + '/api/forecast/frequency-regulation-demand?date=' + date,
+      BASE + '/api/forecast/day-ahead-line-limit?date=' + date + '&limit=200'
+    ];
+  }
+  return [
+    BASE + '/api/daily-summary?date=' + date, BASE + '/api/load-info?date=' + date,
+    BASE + '/api/renewable?date=' + date, BASE + '/api/price?date=' + date,
+    BASE + '/api/non-spot?date=' + date, BASE + '/api/tie-line?date=' + date,
+    BASE + '/api/section-heatmap?date=' + date, BASE + '/api/reserve?date=' + date,
+    BASE + '/api/mandatory-plan?date=' + date, BASE + '/api/maintenance?date=' + date,
+    BASE + '/api/transmission?date=' + date,
+    BASE + '/api/data/transformer-flow?date=' + date,
+    BASE + '/api/data/line-flow?date=' + date
+  ];
+}
+
+function forecastRowsToHeatmap(rows) {
+  var map = {};
+  (rows || []).forEach(function(r) {
+    var key = r.section_name + '|' + r.data_type;
+    if (!map[key]) map[key] = { name: key, values: new Array(96).fill(null) };
+    var idx = parseInt(r.time_id, 10) - 1;
+    if (idx >= 0 && idx < 96) map[key].values[idx] = parseFloat(r.value);
+  });
+  return Object.keys(map).map(function(k) { return map[k]; });
+}
+
+function updateForecastKpis(loadRows, priceRows) {
+  var loads = (loadRows || []).map(function(r){return parseFloat(r.system_load);}).filter(function(v){return !isNaN(v);});
+  if (loads.length) {
+    updateKPI('kpiMaxLoad', Math.max.apply(null, loads), 'MW');
+    updateKPI('kpiMinLoad', Math.min.apply(null, loads), 'MW');
+    updateKPI('kpiAvgLoad', loads.reduce(function(a,b){return a+b;},0)/loads.length, 'MW');
+  }
+  var prices = (priceRows || []).map(function(r){return parseFloat(r.price_user_side);}).filter(function(v){return !isNaN(v);});
+  if (prices.length) {
+    updateKPI('kpiMaxPrice', Math.max.apply(null, prices), '元/MWh');
+    updateKPI('kpiMinPrice', Math.min.apply(null, prices), '元/MWh');
+    updateKPI('kpiAvgPrice', prices.reduce(function(a,b){return a+b;},0)/prices.length, '元/MWh');
+  }
+}
+
+async function refresh() {
+  if (!currentDate) return;
+  showLoading();
+  var date = currentDate;
+  var urls = getApiUrls(date);
+  try {
+    var responses = await Promise.allSettled(urls.map(function(u) { return fetch(u); }));
+
+    if (currentModule === 'actual' && responses[0].status === 'fulfilled' && responses[0].value.ok) {
+      try {
+        var sum = await responses[0].value.json();
+        var L = sum.load || {}, P = sum.price || {};
+        updateKPI('kpiMaxLoad', L.max_load, 'MW'); updateKPI('kpiMinLoad', L.min_load, 'MW'); updateKPI('kpiAvgLoad', L.avg_load, 'MW');
+        updateKPI('kpiMaxPrice', P.max_price, '\u5143/MWh'); updateKPI('kpiMinPrice', P.min_price, '\u5143/MWh'); updateKPI('kpiAvgPrice', P.avg_price, '\u5143/MWh');
+      } catch(e) {
+        ['kpiMaxLoad','kpiMinLoad','kpiAvgLoad','kpiMaxPrice','kpiMinPrice','kpiAvgPrice'].forEach(function(id) { $(id).innerHTML = '--'; });
+      }
+    } else {
+      ['kpiMaxLoad','kpiMinLoad','kpiAvgLoad','kpiMaxPrice','kpiMinPrice','kpiAvgPrice'].forEach(function(id) { $(id).innerHTML = '--'; });
+    }
+
+    var jsonPromises = responses.slice(1).map(function(resp) {
+      if (resp.status !== 'fulfilled' || !resp.value.ok) return Promise.resolve(null);
+      return resp.value.json().then(function(j) { return (j.data || []); }).catch(function() { return null; });
+    });
+    var datas = await Promise.all(jsonPromises);
+
+    if (currentModule === 'forecast') updateForecastKpis(datas[0], datas[2]);
+
+    // [1] Load info - cache & render
+    var d1 = datas[0]; cachedData['load-info'] = d1;
+    if (d1 && d1.length > 0) {
+      var lb1 = d1.map(function(r) { return r.time_label; });
+      renderChart(chartLoad, 'errLoad', lb1, [
+        { name: '统调负荷', type: 'line', data: d1.map(function(r){return r.system_load;}), smooth: true, symbol: 'none', lineStyle: { color: '#5b8af7', width: 2 }, areaStyle: { color: 'rgba(91,138,247,0.06)' } },
+        { name: '总出力', type: 'line', data: d1.map(function(r){return r.total_output;}), smooth: true, symbol: 'none', lineStyle: { color: '#4ecdc4', width: 1.5 } },
+        { name: '省间联络线', type: 'line', data: d1.map(function(r){return r.inter_provincial_tie;}), smooth: true, symbol: 'none', lineStyle: { color: '#f0a058', width: 1.5 } },
+        { name: '非现货机组', type: 'line', data: d1.map(function(r){return r.non_spot_output;}), smooth: true, symbol: 'none', lineStyle: { color: '#c792ea', width: 1.5 } },
+        { name: '新能源', type: 'line', data: d1.map(function(r){return r.renewable_output;}), smooth: true, symbol: 'none', lineStyle: { color: '#5cb878', width: 1.5 } },
+        { name: '水电', type: 'line', data: d1.map(function(r){return r.hydro_output;}), smooth: true, symbol: 'none', lineStyle: { color: '#58a9d4', width: 1.5 } },
+        { name: '抽蓄', type: 'line', data: d1.map(function(r){return r.pumped_output;}), smooth: true, symbol: 'none', lineStyle: { color: '#e2b04a', width: 1.5 } }
+      ], 'MW');
+    } else showErr('errLoad', 'chartLoad');
+
+    // [2] Renewable
+    var d2 = datas[1]; cachedData['renewable'] = d2;
+    if (d2 && d2.length > 0) {
+      renderChart(chartRenewable, 'errRenewable', d2.map(function(r){return r.time_label;}), [
+        { name: '风电', type: 'line', data: d2.map(function(r){return r.wind_power;}), smooth: true, symbol: 'none', lineStyle: { color: '#4ecdc4', width: 2 }, areaStyle: { color: 'rgba(78,205,196,0.06)' } },
+        { name: '光伏', type: 'line', data: d2.map(function(r){return r.solar_power;}), smooth: true, symbol: 'none', lineStyle: { color: '#ffa726', width: 2 }, areaStyle: { color: 'rgba(255,167,38,0.06)' } }
+      ], 'MW');
+    } else showErr('errRenewable', 'chartRenewable');
+
+    // [3] Price
+    var d3 = datas[2]; cachedData['price'] = d3;
+    if (d3 && d3.length > 0) {
+      renderChart(chartPrice, 'errPrice', d3.map(function(r,i){return i+1;}), [
+        { name: '\u8c6b\u4e1c\u4e2d', type: 'line', data: d3.map(function(r){return r.price_central_east;}), smooth: true, symbol: 'none', lineStyle: { color: '#5a7aff', width: 1.5 } },
+        { name: '\u8c6b\u5357', type: 'line', data: d3.map(function(r){return r.price_south;}), smooth: true, symbol: 'none', lineStyle: { color: '#4ecdc4', width: 1.5 } },
+        { name: '\u8c6b\u897f', type: 'line', data: d3.map(function(r){return r.price_west;}), smooth: true, symbol: 'none', lineStyle: { color: '#ff6b6b', width: 1.5 } },
+        { name: '\u8c6b\u5317', type: 'line', data: d3.map(function(r){return r.price_north;}), smooth: true, symbol: 'none', lineStyle: { color: '#ffa726', width: 1.5 } },
+        { name: '\u7528\u6237\u4fa7', type: 'line', data: d3.map(function(r){return r.price_user_side;}), smooth: true, symbol: 'none', lineStyle: { color: '#ce93d8', width: 2, type: 'dashed' } }
+      ], '\u5143/MWh', {
+        tooltipFormatter: function(params) { return params[0].axisValue + ':00<br/>' + params.map(function(p) { return p.marker + ' ' + p.seriesName + ': ' + p.value; }).join('<br/>'); }
+      });
+    } else showErr('errPrice', 'chartPrice');
+
+    // [4] Non-spot
+    var d4 = datas[3]; cachedData['non-spot'] = d4;
+    if (d4 && d4.length > 0) {
+      renderChart(chartNonSpot, 'errNonSpot', d4.map(function(r){return r.time_label;}), [
+        { name: '\u706b\u7535', type: 'line', data: d4.map(function(r){return r.thermal_power;}), smooth: true, symbol: 'none', lineStyle: { color: '#ff7043', width: 2 }, areaStyle: { color: 'rgba(255,112,67,0.06)' } },
+        { name: '\u6c34\u7535', type: 'line', data: d4.map(function(r){return r.hydro_power;}), smooth: true, symbol: 'none', lineStyle: { color: '#26c6da', width: 2 }, areaStyle: { color: 'rgba(38,198,218,0.06)' } },
+        { name: '\u62bd\u6c34\u84c4\u80fd', type: 'line', data: d4.map(function(r){return r.pumped_storage;}), smooth: true, symbol: 'none', lineStyle: { color: '#ab47bc', width: 2 }, areaStyle: { color: 'rgba(171,71,188,0.06)' } }
+      ], 'MW');
+    } else showErr('errNonSpot', 'chartNonSpot');
+
+    // [5] Tie-line
+    var d5 = datas[4]; cachedData['tie-line'] = d5;
+    if (d5 && d5.length > 0) {
+      renderChart(chartTieLine, 'errTieLine', d5.map(function(r){return r.time_label;}), [
+        { name: '长南线', type: 'line', data: d5.map(function(r){return r.changnan;}), smooth: true, symbol: 'none', lineStyle: { color: '#5a7aff', width: 1.2 } },
+        { name: '灵宝I', type: 'line', data: d5.map(function(r){return r.lingbao_i;}), smooth: true, symbol: 'none', lineStyle: { color: '#4ecdc4', width: 1.2 } },
+        { name: '灵宝II', type: 'line', data: d5.map(function(r){return r.lingbao_ii;}), smooth: true, symbol: 'none', lineStyle: { color: '#ffa726', width: 1.2 } },
+        { name: '主网入豫', type: 'line', data: d5.map(function(r){return r.main_network_to_henan;}), smooth: true, symbol: 'none', lineStyle: { color: '#ce93d8', width: 1.5 } },
+        { name: '青豫直流', type: 'line', data: d5.map(function(r){return r.qingyu_dc;}), smooth: true, symbol: 'none', lineStyle: { color: '#ff6b6b', width: 1.5 } },
+        { name: '天中直流', type: 'line', data: d5.map(function(r){return r.tianzhong_dc;}), smooth: true, symbol: 'none', lineStyle: { color: '#26c6da', width: 1.5 } }
+      ], 'MW');
+    } else showErr('errTieLine', 'chartTieLine');
+
+    // [6] Heatmap
+    var d6 = datas[5]; if (currentModule === 'forecast') d6 = forecastRowsToHeatmap(d6); cachedData['section-heatmap'] = d6;
+    if (d6 && d6.length > 0) renderHeatmap(d6);
+    else $('errHeatmap').style.display = 'flex';
+
+    // [7] Reserve
+    var d7 = datas[6]; cachedData['reserve'] = d7;
+    if (d7 && d7.length > 0) {
+      var groups = {}, labels = [];
+      for (var i = 0; i < d7.length; i++) {
+        var r = d7[i], tp = r.reserve_type;
+        if (!groups[tp]) groups[tp] = [];
+        groups[tp].push(parseFloat(r.reserve_value));
+        if (tp === '\u6b63\u5907\u7528') labels.push(r.time_label);
+      }
+      var seriesArr = [];
+      var colors = { '\u6b63\u5907\u7528': '#4ecdc4', '\u8d1f\u5907\u7528': '#ff6b6b' };
+      for (var tp in groups) {
+        if (!groups.hasOwnProperty(tp)) continue;
+        seriesArr.push({ name: tp, type: 'line', data: groups[tp], smooth: true, symbol: 'none', lineStyle: { color: colors[tp] || '#888', width: 2 }, areaStyle: { color: 'rgba(255,255,255,0.04)' } });
+      }
+      renderChart(chartReserve, 'errReserve', labels, seriesArr, 'MW');
+    } else showErr('errReserve', 'chartReserve');
+
+    // [8] Mandatory plan
+    var d8 = datas[7]; cachedData['mandatory-plan'] = d8;
+    if (d8 && d8.length > 0) {
+      var cols = Object.keys(d8[0]).map(function(k) { return { label: k, key: k }; });
+      renderTable('mandPlanWrap', 'emptyMandPlan', d8, cols);
+    } else { $('mandPlanWrap').innerHTML = ''; $('emptyMandPlan').style.display = 'flex'; }
+
+    // [9] Maintenance
+    var d9 = datas[8]; cachedData['maintenance'] = d9;
+    if (d9 && d9.length > 0) {
+      renderChart(chartMaintenance, 'errMaintenance', d9.map(function(r){return r.time_label;}), [
+        { name: '\u68c0\u4fee\u5bb9\u91cf', type: 'line', data: d9.map(function(r){return r.total_maintenance_capacity;}), smooth: true, symbol: 'none', lineStyle: { color: '#ffa726', width: 2 }, areaStyle: { color: 'rgba(255,167,38,0.08)' } }
+      ], 'MW');
+    } else showErr('errMaintenance', 'chartMaintenance');
+
+    // [10] Transmission
+    var d10 = datas[9]; cachedData['transmission'] = d10;
+    if (d10 && d10.length > 0) {
+      var cols = Object.keys(d10[0]).map(function(k) { return { label: k, key: k }; });
+      renderTable('transWrap', 'emptyTrans', d10, cols);
+    } else { $('transWrap').innerHTML = ''; $('emptyTrans').style.display = 'flex'; }
+
+    // [11] Transformer Flow
+    var d11 = datas[10]; cachedData['transformer-flow'] = d11;
+    if (d11 && d11.length > 0) {
+      if (currentModule === 'forecast') {
+        renderChart(chartTransformer, 'errTransformer', d11.map(function(r){return r.time_label;}), [
+          { name: '调频需求', type: 'line', data: d11.map(function(r){return parseFloat(r.demand);}), smooth: true, symbol: 'none', lineStyle: { color: '#ab47bc', width: 2 }, areaStyle: { color: 'rgba(171,71,188,0.06)' } }
+        ], 'MW');
+      } else {
+        renderChart(chartTransformer, 'errTransformer', d11.map(function(r){return r.time_label;}), [
+          { name: '变压器潮流', type: 'line', data: d11.map(function(r){return parseFloat(r.value);}), smooth: true, symbol: 'none', lineStyle: { color: '#ab47bc', width: 2 }, areaStyle: { color: 'rgba(171,71,188,0.06)' } }
+        ], 'MW');
+      }
+    } else showErr('errTransformer', 'chartTransformer');
+
+    // [12] Line Flow
+    var d12 = datas[11]; cachedData['line-flow'] = d12;
+    if (d12 && d12.length > 0) {
+      if (currentModule === 'forecast') {
+        renderChart(chartLine, 'errLine', d12.map(function(r,i){return i+1;}), [
+          { name: '线路限额', type: 'line', data: d12.map(function(r){return parseFloat(r.limit_value || 0);}), smooth: true, symbol: 'none', lineStyle: { color: '#26c6da', width: 2 }, areaStyle: { color: 'rgba(38,198,218,0.06)' } }
+        ], 'MW');
+      } else {
+        renderChart(chartLine, 'errLine', d12.map(function(r){return r.time_label;}), [
+          { name: '线路潮流', type: 'line', data: d12.map(function(r){return parseFloat(r.value);}), smooth: true, symbol: 'none', lineStyle: { color: '#26c6da', width: 2 }, areaStyle: { color: 'rgba(38,198,218,0.06)' } }
+        ], 'MW');
+      }
+    } else showErr('errLine', 'chartLine');
+
+  } catch(e) { console.error('Refresh error:', e); }
+  finally { hideLoading(); }
+}
+
+async function loadStats() {
+  try {
+    var resp = await fetch(BASE + '/api/stats');
+    if (!resp.ok) throw new Error('stats failed');
+    var stats = await resp.json();
+    var html = '';
+    for (var table in stats) {
+      if (!stats.hasOwnProperty(table)) continue;
+      var info = stats[table];
+      html += '<span class="stat-item">' + table + ': ' + info.count + ' \u6761';
+      if (info.date_range) html += ' (' + info.date_range + ')';
+      html += '</span>';
+    }
+    $('footerInfo').innerHTML = html;
+  } catch(e) { $('footerInfo').innerHTML = '\u7edf\u8ba1\u4fe1\u606f\u52a0\u8f7d\u5931\u8d25'; }
+}
+
+async function init() {
+  readUrlState();
+  initSidebar();
+  initCharts();
+  try {
+    var resp = await fetch(BASE + '/api/dates');
+    if (!resp.ok) throw new Error('dates failed');
+    var data = await resp.json();
+    var dates = data.dates || [];
+    if (dates && dates.length > 0) {
+      dates.sort(function(a, b) { return b.localeCompare(a); });
+      if (!currentDate) currentDate = dates[0];
+      $('datePicker').value = currentDate;
+    }
+  } catch(e) { console.error('Failed to load dates:', e); }
+  renderSectionNav(currentModule === 'forecast');
+  await refresh();
+  loadStats();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
