@@ -17,22 +17,24 @@ EXPAND_PARENTS = ["信息披露"]
 
 
 def click_by_text(page, text):
-    """点击侧边栏 treeitem（文本可能包含子节点）"""
+    """点击侧边栏 treeitem（用直接文本节点匹配，不含子节点）"""
     return page.evaluate("""
     (function() {
         var target = "__TARGET__";
         var items = document.querySelectorAll('[role="treeitem"]');
-        // 精确匹配
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
-            var t = (el.textContent || '').trim();
+            // 只取直接文本节点
+            var t = '';
+            for (var j = 0; j < el.childNodes.length; j++) {
+                var node = el.childNodes[j];
+                if (node.nodeType === 3) t += node.textContent;
+                if (node.nodeType === 1 && node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
+                    t += node.childNodes[0].textContent;
+                }
+            }
+            t = t.trim();
             if (t === target) { el.click(); return target; }
-        }
-        // 前缀匹配（文本可能包含子节点）
-        for (var i = 0; i < items.length; i++) {
-            var el = items[i];
-            var t = (el.textContent || '').trim();
-            if (t.indexOf(target) === 0) { el.click(); return target; }
         }
         return null;
     })()
@@ -170,19 +172,27 @@ def get_leaves(page):
     (function() {
         var items = document.querySelectorAll('[role="treeitem"]');
         var result = [];
+        var seen = {};
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
             // 有 aria-expanded → 父节点
             if (el.hasAttribute('aria-expanded')) continue;
-            // 下一个兄弟是 [role="group"] → 父节点（有子菜单）
-            var next = el.nextElementSibling;
-            if (next && next.getAttribute('role') === 'group') continue;
-            var text = (el.textContent || '').trim();
-            // 跳过弹窗页面
+            // 只取直接文本节点（不含子节点）
+            var text = '';
+            for (var j = 0; j < el.childNodes.length; j++) {
+                var node = el.childNodes[j];
+                if (node.nodeType === 3) text += node.textContent;
+                // 也检查第一个子元素（如 <span> 里的文本）
+                if (node.nodeType === 1 && node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
+                    text += node.childNodes[0].textContent;
+                }
+            }
+            text = text.trim();
+            if (!text || text.length > 20) continue;
             if (text === '绿证交易') continue;
-            // 跳过超长文本（父节点 textContent 含子节点）
-            if (text.length > 30) continue;
-            result.push(text.substring(0, 50));
+            if (seen[text]) continue;
+            seen[text] = true;
+            result.push(text);
         }
         return result;
     })()
