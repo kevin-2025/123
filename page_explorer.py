@@ -155,7 +155,7 @@ def main():
                 if (__I__ < items.length) { items[__I__].click(); }
             })()
             """.replace("__I__", str(i)))
-            time.sleep(0.3)
+            time.sleep(5)
         time.sleep(3)
 
         # 后续轮：只点收起状态的
