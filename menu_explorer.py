@@ -43,8 +43,8 @@ def main():
                 var items = document.querySelectorAll('[role="treeitem"]');
                 for (var i = 0; i < items.length; i++) {
                     var el = items[i];
-                    var aria = el.getAttribute('aria-expanded');
-                    if (aria === 'false' || !aria) {
+                    // 只点有 aria-expanded 属性的（父节点），叶子节点会跳转页面
+                    if (el.hasAttribute('aria-expanded') && el.getAttribute('aria-expanded') !== 'true') {
                         el.click();
                     }
                 }
