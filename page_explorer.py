@@ -129,18 +129,30 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(LOCAL_CHROME_DEBUG)
         context = browser.contexts[0]
-        page = context.new_page()
 
-        print(f"🌐 打开页面...")
-        page.goto(URL, wait_until="domcontentloaded", timeout=60000)
-        time.sleep(5)
+        # 使用已有页面（不新建），取第一个非空白页
+        pages = context.pages
+        page = None
+        for p in pages:
+            url = p.url
+            if 'pmos' in url or 'sgcc' in url:
+                page = p
+                break
+        if not page:
+            page = pages[0] if pages else context.new_page()
+
+        print(f"🌐 使用已有页面: {page.url[:80]}...")
+
+        # 如果页面不在数据页，导航过去
+        if 'informationDisclosure' not in page.url:
+            page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+            time.sleep(5)
 
         # 等待侧边栏出现
         try:
             page.wait_for_selector('[role="treeitem"]', timeout=15000)
         except:
             print("❌ 侧边栏未加载，请确认页面已打开")
-            page.close()
             return
 
         # 展开所有菜单
@@ -149,17 +161,29 @@ def main():
         count = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
         print(f"   初始: {count} 项")
         for i in range(count):
-            page.evaluate("""
+            clicked = page.evaluate("""
             (function() {
                 var items = document.querySelectorAll('[role="treeitem"]');
-                if (__I__ < items.length) { items[__I__].click(); }
+                if (__I__ < items.length) {
+                    var el = items[__I__];
+                    el.click();
+                    return (el.textContent || '').trim().substring(0, 30);
+                }
+                return null;
             })()
             """.replace("__I__", str(i)))
+            print(f"   [{i+1}/{count}] 点击: {clicked}")
             time.sleep(5)
         time.sleep(3)
 
+        after_first = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
+        print(f"   第一轮后: {after_first} 项")
+
         # 后续轮：只点收起状态的
         expand_all_parents(page)
+
+        after_expand = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
+        print(f"   展开后: {after_expand} 项")
 
         # 获取菜单树
         menu_tree = get_menu_tree(page)
