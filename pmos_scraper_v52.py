@@ -21,19 +21,19 @@ LOCAL_CHROME_DEBUG = "http://127.0.0.1:9222"
 MODE_CONFIG = {
     "actual": {
         "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/actual",
-        # 侧边栏切换目标（点击 treeitem）
         "switch_to": "电网运行实际信息",
-        "tab_keywords": ["负荷", "联络线", "非现货", "新能源", "机组检修", "输变电", "备用", "断面", "必开", "电价"],
-        "skip_tabs": {"实际变压器潮流息", "实际线路潮流"},
+        # 不设 tab_keywords → 爬取全部 Tab
+        "tab_keywords": None,
+        "skip_tabs": set(),
         "xhr_export_tabs": ["断面约束"],
         "output_prefix": "power_data_actual",
         "label": "实际运行数据"
     },
     "forecast": {
         "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/actual",
-        # 侧边栏切换目标（点击 treeitem）
         "switch_to": "电网运行预测信息",
-        "tab_keywords": ["负荷", "联络线", "非现货", "新能源", "机组检修", "输变电", "备用", "断面", "必开", "电价", "调频", "调峰", "日前", "开停机"],
+        # 不设 tab_keywords → 爬取全部 Tab
+        "tab_keywords": None,
         "skip_tabs": set(),
         "xhr_export_tabs": ["断面约束"],
         "output_prefix": "power_data_forecast",
@@ -531,7 +531,7 @@ def run_mode(mode, dates, browser):
     """运行单个模式"""
     cfg = MODE_CONFIG[mode]
     url = cfg['url']
-    tab_keywords = cfg['tab_keywords']
+    tab_keywords = cfg.get('tab_keywords')
     output_prefix = cfg['output_prefix']
     switch_to = cfg['switch_to']
 
@@ -569,8 +569,12 @@ def run_mode(mode, dates, browser):
         return result;
     })()
     """)
-    data_tabs = [t for t in tabs if any(k in t['text'] for k in tab_keywords)]
-    print(f"   页面共 {len(tabs)} 个 Tab，匹配 {len(data_tabs)} 个:")
+    if tab_keywords:
+        data_tabs = [t for t in tabs if any(k in t['text'] for k in tab_keywords)]
+        print(f"   页面共 {len(tabs)} 个 Tab，匹配 {len(data_tabs)} 个:")
+    else:
+        data_tabs = tabs  # 不过滤，全部爬取
+        print(f"   页面共 {len(tabs)} 个 Tab，全部爬取:")
     for t in data_tabs:
         print(f"     - {t['text']}")
 
