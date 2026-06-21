@@ -17,23 +17,15 @@ EXPAND_PARENTS = ["信息披露"]
 
 
 def click_by_text(page, text):
-    """点击侧边栏 treeitem（用直接文本节点匹配，不含子节点）"""
+    """点击侧边栏 treeitem"""
     return page.evaluate("""
     (function() {
         var target = "__TARGET__";
         var items = document.querySelectorAll('[role="treeitem"]');
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
-            // 只取直接文本节点
-            var t = '';
-            for (var j = 0; j < el.childNodes.length; j++) {
-                var node = el.childNodes[j];
-                if (node.nodeType === 3) t += node.textContent;
-                if (node.nodeType === 1 && node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
-                    t += node.childNodes[0].textContent;
-                }
-            }
-            t = t.trim();
+            var s = el.querySelector('.asideTreeSpan');
+            var t = s ? s.textContent.trim() : '';
             if (t === target) { el.click(); return target; }
         }
         return null;
@@ -175,20 +167,14 @@ def get_leaves(page):
         var seen = {};
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
+            // 有 [role="group"] 直接子元素 → 父节点
+            if (el.querySelector(':scope > [role="group"]')) continue;
             // 有 aria-expanded → 父节点
             if (el.hasAttribute('aria-expanded')) continue;
-            // 只取直接文本节点（不含子节点）
-            var text = '';
-            for (var j = 0; j < el.childNodes.length; j++) {
-                var node = el.childNodes[j];
-                if (node.nodeType === 3) text += node.textContent;
-                // 也检查第一个子元素（如 <span> 里的文本）
-                if (node.nodeType === 1 && node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
-                    text += node.childNodes[0].textContent;
-                }
-            }
-            text = text.trim();
-            if (!text || text.length > 20) continue;
+            // 取 .asideTreeSpan 的文本
+            var s = el.querySelector('.asideTreeSpan');
+            var text = s ? s.textContent.trim() : '';
+            if (!text) continue;
             if (text === '绿证交易') continue;
             if (seen[text]) continue;
             seen[text] = true;
@@ -240,7 +226,6 @@ def main():
         print(f"🍃 {len(leaves)} 个叶子页面\n")
 
         results = []
-        prev_tabs = None
         for idx, leaf in enumerate(leaves):
             print(f"[{idx+1}/{len(leaves)}] {leaf}...", end=" ", flush=True)
 
@@ -249,25 +234,17 @@ def main():
                 print("❌ 点击失败")
                 continue
 
-            # 等 iframe 稳定
             wait_for_iframe_stable(page)
             time.sleep(1)
 
             tabs = get_tabs_from_iframe(page)
             data_tabs = [t for t in tabs if t not in ('常规菜单', '定制菜单', '展开')]
 
-            # 检测是否读到旧数据
-            stale = prev_tabs and data_tabs == prev_tabs
-            prev_tabs = data_tabs
-
             entry = {"path": leaf, "tab_count": len(data_tabs), "tabs": data_tabs}
-            if stale:
-                entry["stale"] = True
             results.append(entry)
 
             if data_tabs:
-                tag = "⚠️重复" if stale else "✅"
-                print(f"{tag} {len(data_tabs)}Tab: {', '.join(data_tabs[:8])}")
+                print(f"✅ {len(data_tabs)}Tab: {', '.join(data_tabs[:8])}")
             else:
                 print(f"📄 无Tab")
 
