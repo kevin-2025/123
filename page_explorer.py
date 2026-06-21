@@ -17,6 +17,7 @@ EXPAND_PARENTS = ["信息披露"]
 
 
 def click_by_text(page, text):
+    """点击侧边栏 treeitem（文本可能包含子节点）"""
     return page.evaluate("""
     (function() {
         var target = "__TARGET__";
@@ -25,15 +26,13 @@ def click_by_text(page, text):
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
             var t = (el.textContent || '').trim();
-            if (t === target) { el.click(); return t.substring(0, 50); }
+            if (t === target) { el.click(); return target; }
         }
-        // 前缀匹配
+        // 前缀匹配（文本可能包含子节点）
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
             var t = (el.textContent || '').trim();
-            if (t.indexOf(target) === 0 && t.length < target.length + 5) {
-                el.click(); return t.substring(0, 50);
-            }
+            if (t.indexOf(target) === 0) { el.click(); return target; }
         }
         return null;
     })()
@@ -171,18 +170,16 @@ def get_leaves(page):
     (function() {
         var items = document.querySelectorAll('[role="treeitem"]');
         var result = [];
-        var parentNames = ["信息披露", "绿证交易"];
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
-            if (!el.hasAttribute('aria-expanded')) {
-                var text = (el.textContent || '').trim().substring(0, 50);
-                // 跳过弹窗页面
-                var skip = false;
-                for (var j = 0; j < parentNames.length; j++) {
-                    if (text === parentNames[j]) skip = true;
-                }
-                if (!skip) result.push(text);
-            }
+            // 有 aria-expanded → 父节点，跳过
+            if (el.hasAttribute('aria-expanded')) continue;
+            var text = (el.textContent || '').trim();
+            // textContent 过长说明包含子节点文本 → 父节点，跳过
+            if (text.length > 25) continue;
+            // 跳过弹窗页面
+            if (text === '绿证交易') continue;
+            result.push(text.substring(0, 50));
         }
         return result;
     })()
