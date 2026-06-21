@@ -21,7 +21,8 @@ LOCAL_CHROME_DEBUG = "http://127.0.0.1:9222"
 MODE_CONFIG = {
     "actual": {
         "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/actual",
-        "switch_keyword": "实际",
+        # 侧边栏切换目标（点击 treeitem）
+        "switch_to": "电网运行实际信息",
         "tab_keywords": ["负荷", "联络线", "非现货", "新能源", "机组检修", "输变电", "备用", "断面", "必开", "电价"],
         "skip_tabs": {"实际变压器潮流息", "实际线路潮流"},
         "xhr_export_tabs": ["断面约束"],
@@ -30,7 +31,8 @@ MODE_CONFIG = {
     },
     "forecast": {
         "url": "https://pmos.ha.sgcc.com.cn/pxf-common-qctc/#/pxf-common-qctc/qctc-trade/informationDisclosure/actual",
-        "switch_keyword": "预测",
+        # 侧边栏切换目标（点击 treeitem）
+        "switch_to": "电网运行预测信息",
         "tab_keywords": ["负荷", "联络线", "非现货", "新能源", "机组检修", "输变电", "备用", "断面", "必开", "电价", "调频", "调峰", "日前", "开停机"],
         "skip_tabs": set(),
         "xhr_export_tabs": ["断面约束"],
@@ -376,46 +378,28 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 # ============================================================
 # 新增：页面内模式切换（实际/预测）
 # ============================================================
-def switch_mode_in_page(page, switch_keyword):
-    """在页面顶部 1/3 区域查找并点击包含 switch_keyword 的切换按钮"""
+def switch_mode_in_page(page, switch_to):
+    """点击侧边栏 treeitem 切换到目标页面（如：电网运行实际信息 / 电网运行预测信息）"""
     js_code = """
     (function() {
-        var keyword = "__KW__";
-        var pageHeight = Math.max(document.documentElement.clientHeight || 600, 600);
-        var maxY = pageHeight / 3;
-        var candidates = [];
-        var selectors = ['[class*="tab"]', '[class*="Tab"]', '[class*="button"]',
-                         '[class*="Button"]', 'a', 'span', 'div', 'li'];
-        for (var s = 0; s < selectors.length; s++) {
-            try {
-                var els = document.querySelectorAll(selectors[s]);
-                for (var i = 0; i < els.length; i++) {
-                    var el = els[i];
-                    var text = (el.textContent || '').trim();
-                    if (!text || text.length > 15) continue;
-                    if (text.indexOf(keyword) === -1) continue;
-                    var rect = el.getBoundingClientRect();
-                    if (rect.width < 20 || rect.height < 20) continue;
-                    if (rect.top > maxY) continue;
-                    // 排除数据 Tab（包含这些关键词的不是切换按钮）
-                    if (text.indexOf('变压器') !== -1 || text.indexOf('线路') !== -1 ||
-                        text.indexOf('潮流') !== -1 || text.indexOf('息') !== -1) continue;
-                    candidates.push({
-                        text: text,
-                        x: rect.left + rect.width / 2,
-                        y: rect.top + rect.height / 2,
-                        cls: el.className ? String(el.className).substring(0, 60) : ''
-                    });
-                }
-            } catch(e) {}
-        }
-        if (candidates.length > 0) {
-            candidates.sort(function(a, b) { return a.y - b.y; });
-            return candidates[0];
+        var target = "__TARGET__";
+        var items = document.querySelectorAll('[role="treeitem"]');
+        for (var i = 0; i < items.length; i++) {
+            var el = items[i];
+            var text = (el.textContent || '').trim();
+            // 匹配 treeitem 文本（如 "电网运行预测信息"）
+            if (text.indexOf(target) !== -1 && text.length < 30) {
+                var rect = el.getBoundingClientRect();
+                return {
+                    text: text.substring(0, 30),
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
+            }
         }
         return null;
     })()
-    """.replace("__KW__", switch_keyword)
+    """.replace("__TARGET__", switch_to)
 
     try:
         result = page.evaluate(js_code)
@@ -434,12 +418,12 @@ def run_mode(mode, dates, browser):
     url = cfg['url']
     tab_keywords = cfg['tab_keywords']
     output_prefix = cfg['output_prefix']
-    switch_kw = cfg['switch_keyword']
+    switch_to = cfg['switch_to']
 
     print(f"\n{'#'*60}")
     print(f"# 🎯 模式: {mode} ({cfg['label']})")
     print(f"# 🌐 URL: {url}")
-    print(f"# 🔀 页面内切换: 点击含\"{switch_kw}\"")
+    print(f"# 🔀 侧边栏切换: 点击\"{switch_to}\"")
     print(f"{'#'*60}")
 
     context = browser.contexts[0]
@@ -449,16 +433,15 @@ def run_mode(mode, dates, browser):
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     time.sleep(5)
 
-    # 页面内切换
-    if switch_kw:
-        print(f"\n🔀 在页面内查找并点击\"{switch_kw}\"按钮...")
-        sw_el = switch_mode_in_page(page, switch_kw)
-        if sw_el:
-            print(f"   找到: {sw_el.get('text')} ({sw_el.get('cls', '')})")
-            page.mouse.click(sw_el['x'], sw_el['y'])
-            time.sleep(3)
-        else:
-            print(f"   ⚠️ 未找到\"{switch_kw}\"切换按钮（可能已在正确页面）")
+    # 点击侧边栏 treeitem 切换到目标页面
+    print(f"\n🔀 在侧边栏查找并点击\"{switch_to}\"...")
+    sw_el = switch_mode_in_page(page, switch_to)
+    if sw_el:
+        print(f"   找到: {sw_el.get('text')}")
+        page.mouse.click(sw_el['x'], sw_el['y'])
+        time.sleep(3)
+    else:
+        print(f"   ⚠️ 未找到\"{switch_to}\"侧边栏项（可能已在正确页面）")
 
     print("\n🔘 获取 Tab...")
     tabs = page.evaluate("""
