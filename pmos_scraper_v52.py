@@ -380,16 +380,61 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 
 
 # ============================================================
-# 新增：页面内模式切换（实际/预测）
+# 新增：展开所有菜单，打印完整菜单树
+# ============================================================
+def expand_all_menus(page):
+    """展开所有侧边栏菜单层级，打印完整菜单树"""
+    # 多轮展开：先展开一级，再展开二级，再展开三级
+    for _ in range(3):
+        page.evaluate("""
+        (function() {
+            var items = document.querySelectorAll('[role="treeitem"]');
+            for (var i = 0; i < items.length; i++) {
+                var el = items[i];
+                var aria = el.getAttribute('aria-expanded');
+                if (aria === 'false' || !aria) {
+                    el.click();
+                }
+            }
+        })()
+        """)
+        time.sleep(2)
+
+    # 打印完整菜单树（带层级缩进）
+    all_items = page.evaluate("""
+    (function() {
+        var items = document.querySelectorAll('[role="treeitem"]');
+        var result = [];
+        for (var i = 0; i < items.length; i++) {
+            var text = (items[i].textContent || '').trim();
+            var aria = items[i].getAttribute('aria-expanded') || '';
+            var level = 0;
+            var parent = items[i].parentElement;
+            while (parent) {
+                if (parent.getAttribute && parent.getAttribute('role') === 'group') level++;
+                parent = parent.parentElement;
+            }
+            result.push({text: text.substring(0, 50), level: level, expanded: aria});
+        }
+        return result;
+    })()
+    """)
+
+    print(f"\n   📋 完整菜单树 ({len(all_items)}项):")
+    for it in all_items:
+        indent = "  " * it['level']
+        mark = "▼" if it['expanded'] == 'true' else "▶"
+        print(f"      {indent}{mark} {it['text']}")
+
+    return all_items
+
+
+# ============================================================
+# 页面内模式切换（实际/预测）
 # ============================================================
 def switch_mode_in_page(page, switch_to):
     """点击侧边栏 treeitem 切换到目标页面
-    侧边栏结构:
-      省内现货（一级菜单）
-        └── 信息披露（二级菜单）
-              ├── 电网运行实际信息
-              └── 电网运行预测信息
-    注意：还有另一个"信息披露"与"省内现货"同级，需区分开
+    注意：有两个"信息披露"——一级菜单的和"省内现货"下的二级菜单
     """
     # 步骤1：展开"省内现货"（一级菜单）
     page.evaluate("""
@@ -409,7 +454,6 @@ def switch_mode_in_page(page, switch_to):
     time.sleep(2)
 
     # 步骤2：展开"省内现货"下的"信息披露"（二级菜单）
-    # 关键：有两个"信息披露"，需要找的是"省内现货"子节点里的那个
     # 用 DOM 层级判断：在 [role="group"] 内的才是二级菜单
     page.evaluate("""
     (function() {
@@ -417,13 +461,10 @@ def switch_mode_in_page(page, switch_to):
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
             var text = (el.textContent || '').trim();
-            // 必须是"信息披露"且文字较短（排除带数字的）
             if (text.indexOf('信息披露') !== -1 && text.length < 20) {
-                // 检查是否在 [role="group"] 内（二级菜单的标志）
                 var parent = el.parentElement;
                 while (parent) {
                     if (parent.getAttribute('role') === 'group') {
-                        // 确认是二级菜单的"信息披露"
                         if (el.getAttribute('aria-expanded') !== 'true') {
                             el.click();
                         }
@@ -431,29 +472,11 @@ def switch_mode_in_page(page, switch_to):
                     }
                     parent = parent.parentElement;
                 }
-                // 不在 group 内 → 这是一级菜单的"信息披露"，跳过
             }
         }
     })()
     """)
     time.sleep(2)
-
-    # 打印所有 treeitem 文本（调试用）
-    all_items = page.evaluate("""
-    (function() {
-        var items = document.querySelectorAll('[role="treeitem"]');
-        var result = [];
-        for (var i = 0; i < items.length; i++) {
-            var text = (items[i].textContent || '').trim();
-            var aria = items[i].getAttribute('aria-expanded') || '';
-            result.push(text.substring(0, 40) + (aria ? ' [' + aria + ']' : ''));
-        }
-        return result;
-    })()
-    """)
-    print(f"   📋 侧边栏 treeitem ({len(all_items)}个):")
-    for it in all_items[:30]:
-        print(f"      - {it}")
 
     # 步骤3：点击目标 treeitem
     clicked = page.evaluate("""
