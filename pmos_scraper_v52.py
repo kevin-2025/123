@@ -323,6 +323,8 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
     skip_tabs = mode_cfg['skip_tabs']
     xhr_tabs = mode_cfg['xhr_export_tabs']
 
+    date_set = False  # 日期只选一次，所有Tab共用
+
     for tab_idx, tab in enumerate(data_tabs):
         if tab['text'] in skip_tabs:
             continue
@@ -333,12 +335,14 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
             page.mouse.click(tab['x'], tab['y'])
             time.sleep(2)
 
-            # 步骤2：选择日期
-            date_ok = pick_date(page, ty, tm, td)
-            if not date_ok:
-                print(f"   ⚠️ 日期选择器无法打开")
-                continue
-            time.sleep(1.5)
+            # 步骤2：选择日期（仅第一个Tab执行一次，后续Tab跳过）
+            if not date_set:
+                date_ok = pick_date(page, ty, tm, td)
+                if not date_ok:
+                    print(f"   ⚠️ 日期选择器无法打开")
+                    continue
+                date_set = True
+                time.sleep(1.5)
 
             # 步骤3：滚动加载
             scroll_to_load(page)
