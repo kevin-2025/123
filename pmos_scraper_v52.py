@@ -383,7 +383,27 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 # 新增：页面内模式切换（实际/预测）
 # ============================================================
 def switch_mode_in_page(page, switch_to):
-    """点击侧边栏 treeitem 切换到目标页面（如：电网运行实际信息 / 电网运行预测信息）"""
+    """点击侧边栏 treeitem 切换到目标页面"""
+    # 先确保"信息披露"父节点已展开
+    page.evaluate("""
+    (function() {
+        var items = document.querySelectorAll('[role="treeitem"]');
+        for (var i = 0; i < items.length; i++) {
+            var text = (items[i].textContent || '').trim();
+            if (text.indexOf('信息披露') !== -1 && text.length < 20) {
+                // 检查是否已展开，未展开则点击
+                var ariaExpanded = items[i].getAttribute('aria-expanded');
+                if (ariaExpanded !== 'true') {
+                    items[i].click();
+                }
+                break;
+            }
+        }
+    })()
+    """)
+    time.sleep(1.5)
+
+    # 再点击目标 treeitem
     js_code = """
     (function() {
         var target = "__TARGET__";
@@ -391,14 +411,15 @@ def switch_mode_in_page(page, switch_to):
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
             var text = (el.textContent || '').trim();
-            // 匹配 treeitem 文本（如 "电网运行预测信息"）
             if (text.indexOf(target) !== -1 && text.length < 30) {
                 var rect = el.getBoundingClientRect();
-                return {
-                    text: text.substring(0, 30),
-                    x: rect.left + rect.width / 2,
-                    y: rect.top + rect.height / 2
-                };
+                if (rect.width > 0 && rect.height > 0) {
+                    return {
+                        text: text.substring(0, 30),
+                        x: rect.left + rect.width / 2,
+                        y: rect.top + rect.height / 2
+                    };
+                }
             }
         }
         return null;
