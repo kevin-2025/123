@@ -36,25 +36,38 @@ def main():
 
         # 多轮展开所有菜单
         print(f"\n🔽 展开所有菜单...")
-        for round_num in range(3):
+        for round_num in range(5):
             before = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
-            page.evaluate("""
-            (function() {
-                var items = document.querySelectorAll('[role="treeitem"]');
-                for (var i = 0; i < items.length; i++) {
-                    var el = items[i];
-                    // 只点有 aria-expanded 属性的（父节点），叶子节点会跳转页面
-                    if (el.hasAttribute('aria-expanded') && el.getAttribute('aria-expanded') !== 'true') {
-                        el.click();
+            if round_num == 0:
+                # 第一轮：初始状态没有 aria-expanded，全部点一遍
+                page.evaluate("""
+                (function() {
+                    var items = document.querySelectorAll('[role="treeitem"]');
+                    for (var i = 0; i < items.length; i++) {
+                        items[i].click();
                     }
-                }
-            })()
-            """)
+                })()
+                """)
+            else:
+                # 后续轮：只点收起状态的父节点
+                page.evaluate("""
+                (function() {
+                    var items = document.querySelectorAll('[role="treeitem"]');
+                    for (var i = 0; i < items.length; i++) {
+                        var el = items[i];
+                        if (el.hasAttribute('aria-expanded') && el.getAttribute('aria-expanded') !== 'true') {
+                            el.click();
+                        }
+                    }
+                })()
+                """)
             time.sleep(2)
             after = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
-            print(f"   第{round_num+1}轮: {before} → {after} 项")
-            if after == before:
-                break  # 没有新项出现，说明都展开了
+            expanded = page.evaluate("document.querySelectorAll('[role=\"treeitem\"][aria-expanded=\"true\"]').length")
+            collapsed = page.evaluate("document.querySelectorAll('[role=\"treeitem\"][aria-expanded=\"false\"]').length")
+            print(f"   第{round_num+1}轮: {before} → {after} 项 (展开:{expanded} 收起:{collapsed})")
+            if after == before and collapsed == 0:
+                break
 
         # 获取完整菜单树
         menu_tree = page.evaluate("""
