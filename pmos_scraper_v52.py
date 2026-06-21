@@ -383,16 +383,22 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 # 新增：页面内模式切换（实际/预测）
 # ============================================================
 def switch_mode_in_page(page, switch_to):
-    """点击侧边栏 treeitem 切换到目标页面"""
-    # 先确保"信息披露"父节点已展开
+    """点击侧边栏 treeitem 切换到目标页面
+    侧边栏结构:
+      省内现货（一级菜单）
+        └── 信息披露（二级菜单）
+              ├── 电网运行实际信息
+              └── 电网运行预测信息
+    注意：还有另一个"信息披露"与"省内现货"同级，需区分开
+    """
+    # 步骤1：展开"省内现货"（一级菜单）
     page.evaluate("""
     (function() {
         var items = document.querySelectorAll('[role="treeitem"]');
         for (var i = 0; i < items.length; i++) {
             var text = (items[i].textContent || '').trim();
-            if (text.indexOf('信息披露') !== -1 && text.length < 20) {
-                var ariaExpanded = items[i].getAttribute('aria-expanded');
-                if (ariaExpanded !== 'true') {
+            if (text.indexOf('省内现货') !== -1 && text.length < 15) {
+                if (items[i].getAttribute('aria-expanded') !== 'true') {
                     items[i].click();
                 }
                 break;
@@ -402,7 +408,37 @@ def switch_mode_in_page(page, switch_to):
     """)
     time.sleep(2)
 
-    # 先打印所有 treeitem 文本（调试用）
+    # 步骤2：展开"省内现货"下的"信息披露"（二级菜单）
+    # 关键：有两个"信息披露"，需要找的是"省内现货"子节点里的那个
+    # 用 DOM 层级判断：在 [role="group"] 内的才是二级菜单
+    page.evaluate("""
+    (function() {
+        var items = document.querySelectorAll('[role="treeitem"]');
+        for (var i = 0; i < items.length; i++) {
+            var el = items[i];
+            var text = (el.textContent || '').trim();
+            // 必须是"信息披露"且文字较短（排除带数字的）
+            if (text.indexOf('信息披露') !== -1 && text.length < 20) {
+                // 检查是否在 [role="group"] 内（二级菜单的标志）
+                var parent = el.parentElement;
+                while (parent) {
+                    if (parent.getAttribute('role') === 'group') {
+                        // 确认是二级菜单的"信息披露"
+                        if (el.getAttribute('aria-expanded') !== 'true') {
+                            el.click();
+                        }
+                        return;
+                    }
+                    parent = parent.parentElement;
+                }
+                // 不在 group 内 → 这是一级菜单的"信息披露"，跳过
+            }
+        }
+    })()
+    """)
+    time.sleep(2)
+
+    # 打印所有 treeitem 文本（调试用）
     all_items = page.evaluate("""
     (function() {
         var items = document.querySelectorAll('[role="treeitem"]');
@@ -419,7 +455,7 @@ def switch_mode_in_page(page, switch_to):
     for it in all_items[:30]:
         print(f"      - {it}")
 
-    # 直接用 element.click() 点击目标 treeitem，不依赖坐标
+    # 步骤3：点击目标 treeitem
     clicked = page.evaluate("""
     (function() {
         var target = "__TARGET__";
