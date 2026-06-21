@@ -251,6 +251,7 @@ def export_section_xhr(page):
     if not data_b64:
         return None
 
+    # 方法1: openpyxl 解析
     try:
         import openpyxl, io
         binary = base64.b64decode(data_b64)
@@ -270,10 +271,42 @@ def export_section_xhr(page):
                         data.append(item)
             print(f"📊 {len(data)}行 {len(headers)}列")
             return data
+        else:
+            # 保存原始文件用于调试
+            fname = 'section_debug.xlsx'
+            with open(fname, 'wb') as f:
+                f.write(binary)
+            print(f"⚠️ openpyxl读出0行，已保存原始文件: {fname}")
     except ImportError:
         print(f"⚠️ pip install openpyxl")
     except Exception as e:
-        print(f"⚠️ {e}")
+        print(f"⚠️ openpyxl错误: {e}，尝试xlrd...")
+        # 方法2: 可能是xls格式
+        try:
+            import xlrd
+            binary = base64.b64decode(data_b64)
+            fname = 'section_debug.xls'
+            with open(fname, 'wb') as f:
+                f.write(binary)
+            wb = xlrd.open_workbook(fname)
+            ws = wb.sheet_by_index(0)
+            headers = [ws.cell_value(0, j) for j in range(ws.ncols)]
+            data = []
+            for i in range(1, ws.nrows):
+                row = ws.row_values(i)
+                if any(v is not None and v != '' for v in row):
+                    item = {}
+                    for j, h in enumerate(headers):
+                        if j < len(row) and row[j] != '':
+                            item[str(h) if h else 'col_%d' % j] = row[j]
+                    if item:
+                        data.append(item)
+            print(f"📊 {len(data)}行 {len(headers)}列")
+            return data
+        except ImportError:
+            print(f"⚠️ pip install xlrd")
+        except Exception as e2:
+            print(f"⚠️ xlrd也失败: {e2}，已保存section_debug.xlsx供手动检查")
 
     return None
 
