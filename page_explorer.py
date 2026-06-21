@@ -135,15 +135,30 @@ def main():
         page.goto(URL, wait_until="domcontentloaded", timeout=60000)
         time.sleep(5)
 
+        # 等待侧边栏出现
+        try:
+            page.wait_for_selector('[role="treeitem"]', timeout=15000)
+        except:
+            print("❌ 侧边栏未加载，请确认页面已打开")
+            page.close()
+            return
+
         # 展开所有菜单
         print(f"🔽 展开所有菜单...")
-        page.evaluate("""
-        (function() {
-            var items = document.querySelectorAll('[role="treeitem"]');
-            for (var i = 0; i < items.length; i++) { items[i].click(); }
-        })()
-        """)
+        # 第一轮：逐个点击所有项（初始没有aria-expanded）
+        count = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
+        print(f"   初始: {count} 项")
+        for i in range(count):
+            page.evaluate("""
+            (function() {
+                var items = document.querySelectorAll('[role="treeitem"]');
+                if (__I__ < items.length) { items[__I__].click(); }
+            })()
+            """.replace("__I__", str(i)))
+            time.sleep(0.3)
         time.sleep(3)
+
+        # 后续轮：只点收起状态的
         expand_all_parents(page)
 
         # 获取菜单树
