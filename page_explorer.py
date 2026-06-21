@@ -143,40 +143,32 @@ def main():
 
         print(f"🌐 使用已有页面: {page.url[:80]}...")
 
-        # 不导航，直接使用当前页面（请确保已在数据页面）
-        if 'informationDisclosure' not in page.url:
-            print("⚠️ 当前不在数据页面，请手动导航到: 省内现货 → 信息披露 → 电网运行实际信息")
-            print("   然后重新运行此脚本")
-            return
+        # 导航到数据页面
+        print(f"🌐 导航到数据页面...")
+        page.goto(URL, wait_until="networkidle", timeout=60000)
+        time.sleep(5)
+        print(f"   当前URL: {page.url[:100]}")
 
         # 等待侧边栏出现
         try:
-            page.wait_for_selector('[role="treeitem"]', timeout=15000)
+            page.wait_for_selector('[role="treeitem"]', timeout=20000)
         except:
-            print("❌ 侧边栏未加载，请确认页面已打开")
+            print("❌ 侧边栏未加载")
             return
 
         # 展开所有菜单
         print(f"🔽 展开所有菜单...")
-        # 第一轮：逐个点击所有项（初始没有aria-expanded）
+        # 第一轮：全部点击（初始没有aria-expanded）
         count = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
         print(f"   初始: {count} 项")
-        for i in range(count):
-            clicked = page.evaluate("""
-            (function() {
-                var items = document.querySelectorAll('[role="treeitem"]');
-                if (__I__ < items.length) {
-                    var el = items[__I__];
-                    el.click();
-                    return (el.textContent || '').trim().substring(0, 30);
-                }
-                return null;
-            })()
-            """.replace("__I__", str(i)))
-            print(f"   [{i+1}/{count}] 点击: {clicked}")
-            time.sleep(5)
+        page.evaluate("""
+        (function() {
+            var items = document.querySelectorAll('[role="treeitem"]');
+            for (var i = 0; i < items.length; i++) { items[i].click(); }
+        })()
+        """)
         time.sleep(3)
-
+        
         after_first = page.evaluate("document.querySelectorAll('[role=\"treeitem\"]').length")
         print(f"   第一轮后: {after_first} 项")
 
