@@ -2,7 +2,7 @@
 """
 电力交易平台 - 一键提取 v52（支持 actual/forecast 双模式）
 =============================================================
-v52: 一个脚本 + mode 参数，同时支持实际数据和预测数据抓取
+基于 v51 改写，新增 --mode 参数支持实际数据和预测数据切换
 用法:
   python3 pmos_scraper_v52.py --mode actual                              # 默认昨天
   python3 pmos_scraper_v52.py --mode forecast 2026-06-16                # 单日
@@ -16,11 +16,7 @@ from datetime import datetime, timedelta
 LOCAL_CHROME_DEBUG = "http://127.0.0.1:9222"
 
 # ============================================================
-# 模式配置（同一 URL + 页面内点击切换按钮）
-#   - switch_keyword: 进入页面后先点击哪个按钮切换模式（如"实际"/"预测"）
-#   - tab_keywords: 切换后匹配哪些数据 Tab
-#   - skip_tabs: 跳过哪些 Tab
-#   - xhr_export_tabs: 需要 XHR 导出 Excel 的 Tab
+# 模式配置
 # ============================================================
 MODE_CONFIG = {
     "actual": {
@@ -43,44 +39,22 @@ MODE_CONFIG = {
     }
 }
 
+# ============================================================
+# 以下函数保持 v51 原样
+# ============================================================
 
 def extract_vue_tables(page):
-    """提取 Vue 表格数据，兼容多种 Vue 组件属性名"""
-    js_code = """
-    (function() {
-        var result = {};
-        var tables = document.querySelectorAll('.el-table, .elx-table');
-        for (var i = 0; i < tables.length; i++) {
-            var table = tables[i];
-            // 尝试多种 Vue 数据路径
-            var vue = table.__vue__ || table.__vueParentComponent__;
-            var rows = null;
-            if (vue) {
-                rows = vue.tableSourceData || vue.tableFullData || vue.tableData ||
-                       vue.table_body_data || vue.tableDataStore || vue.store;
-            }
-            // 如果上面找不到，尝试从 Vue 实例的 $data 里找
-            if (!rows && vue && vue.$data) {
-                var d = vue.$data;
-                rows = d.tableData || d.tableFullData || d.tableSourceData || d.data;
-            }
-            // 尝试从原生 DOM 的 data 属性找
-            if (!rows && table.dataset && table.dataset.tableData) {
-                try { rows = JSON.parse(table.dataset.tableData); } catch(e) {}
-            }
-            if (rows && Array.isArray(rows) && rows.length > 0) {
-                result['t' + i] = {rows: rows, count: rows.length};
-            }
-        }
+    return page.evaluate("""() => {
+        const result = {};
+        document.querySelectorAll('.elx-table').forEach((table, idx) => {
+            const vue = table.__vue__;
+            if (!vue) return;
+            let rows = vue.tableSourceData || vue.tableFullData || vue.tableData || [];
+            if (!rows || rows.length === 0) return;
+            result['t' + idx] = {rows: rows, count: rows.length};
+        });
         return result;
-    })()
-    """
-    try:
-        return page.evaluate(js_code)
-    except Exception as e:
-        print("   [JS错误: " + str(e) + "]")
-        return {}
-
+    }""")
 
 def scroll_to_load(page):
     page.evaluate("""() => {
@@ -100,7 +74,6 @@ def scroll_to_load(page):
     page.evaluate("""() => { window.scrollTo(0, 0); }""")
     time.sleep(0.5)
 
-
 def open_date_picker(page):
     pos = page.evaluate("""() => {
         const input = document.querySelector('.el-date-editor .el-input__inner');
@@ -112,7 +85,6 @@ def open_date_picker(page):
     page.mouse.click(pos['x'], pos['y'])
     time.sleep(1)
     return True
-
 
 def get_picker_header(page):
     return page.evaluate("""() => {
@@ -132,28 +104,26 @@ def get_picker_header(page):
         return { text: text[:30], prevBtn: prev, nextBtn: next };
     }""")
 
-
 def click_day(page, target_day):
-    pos = page.evaluate(f"""() => {{
+    pos = page.evaluate("""() => {
         const picker = document.querySelector('.el-picker-panel, .el-date-picker');
         if (!picker) return null;
         const cells = picker.querySelectorAll('td');
-        for (const cell of cells) {{
+        for (const cell of cells) {
             const cls = cell.className;
-            if (cell.textContent.trim() === String({target_day}) &&
+            if (cell.textContent.trim() === String(__TARGET_DAY__) &&
                 !cls.includes('prev') && !cls.includes('next') &&
-                !cls.includes('prev-month') && !cls.includes('next-month')) {{
+                !cls.includes('prev-month') && !cls.includes('next-month')) {
                 const rect = cell.getBoundingClientRect();
-                return {{x: rect.left + rect.width/2, y: rect.top + rect.height/2}};
-            }}
-        }}
+                return {x: rect.left + rect.width/2, y: rect.top + rect.height/2};
+            }
+        }
         return null;
-    }}""")
+    }""".replace("__TARGET_DAY__", str(target_day)))
     if not pos: return False
     page.mouse.click(pos['x'], pos['y'])
     time.sleep(2.5)
     return True
-
 
 def pick_date(page, target_year, target_month, target_day):
     if not open_date_picker(page):
@@ -263,7 +233,7 @@ def export_section_xhr(page):
         ws = wb.active
         rows_list = list(ws.iter_rows(values_only=True))
         if rows_list:
-            headers = [str(h) if h else f'col_{i}' for i, h in enumerate(rows_list[0])]
+            headers = [str(h) if h else 'col_%d' % i for i, h in enumerate(rows_list[0])]
             data = []
             for row in rows_list[1:]:
                 if row and any(v is not None for v in row):
@@ -283,14 +253,8 @@ def export_section_xhr(page):
     return None
 
 
-def get_table_fingerprint(rows):
-    if not rows: return ""
-    sample = rows[:3]
-    return json.dumps([dict(sorted(r.items())) for r in sample], sort_keys=True, default=str)
-
-
 def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
-    """抓取单日所有 Tab 数据（基于 mode 配置）"""
+    """抓取单日所有 Tab 数据（v51 原版逻辑 + mode 配置）"""
     d = datetime.strptime(date_str, '%Y-%m-%d')
     ty = d.year; tm = d.month; td = d.day
 
@@ -301,7 +265,6 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 
     for tab_idx, tab in enumerate(data_tabs):
         if tab['text'] in skip_tabs:
-            print(f"  ⏭️  [{tab_idx+1}/{len(data_tabs)}] {tab['text']} (跳过)")
             continue
 
         print(f"  📊 [{tab_idx+1}/{len(data_tabs)}] {tab['text']}...", end=" ", flush=True)
@@ -314,7 +277,7 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 
             scroll_to_load(page)
 
-            # XHR导出（断面约束等）
+            # 断面约束：XHR导出
             if any(kw in tab['text'] for kw in xhr_tabs):
                 excel_data = export_section_xhr(page)
                 if excel_data:
@@ -346,38 +309,63 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
     return all_data, total_rows
 
 
+# ============================================================
+# 新增：页面内模式切换（实际/预测）
+# ============================================================
 def switch_mode_in_page(page, switch_keyword):
-    """在页面内查找并点击包含 switch_keyword 的切换按钮（实际/预测）
-    策略: 只看页面上 1/3 区域的元素，避免误匹配到数据 Tab
-    """
-    js = """() => {
-        const keyword = "__KW__";
-        const pageHeight = Math.max(document.documentElement.clientHeight || 600, 600);
-        const maxY = pageHeight / 3;
-        const candidates = [];
-        document.querySelectorAll('[class*="tab"], [class*="Tab"], [class*="button"], [class*="Button"], a, span, div').forEach(function(el) {
-            const text = (el.textContent || '').trim();
-            if (!text || text.length > 15) return;
-            if (!text.includes(keyword)) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.width < 20 || rect.height < 20) return;
-            if (rect.top > maxY) return;
-            if (text.includes('变压器') || text.includes('线路') || text.includes('潮流') || text.includes('息')) return;
-            candidates.push({
-                text: text,
-                x: rect.left + rect.width/2,
-                y: rect.top + rect.height/2,
-                class: el.className ? String(el.className).substring(0, 60) : ''
-            });
-        });
-        candidates.sort(function(a, b) { return a.y - b.y; });
-        return candidates.length > 0 ? candidates[0] : null;
-    }""".replace("__KW__", switch_keyword)
-    return page.evaluate(js)
+    """在页面顶部 1/3 区域查找并点击包含 switch_keyword 的切换按钮"""
+    js_code = """
+    (function() {
+        var keyword = "__KW__";
+        var pageHeight = Math.max(document.documentElement.clientHeight || 600, 600);
+        var maxY = pageHeight / 3;
+        var candidates = [];
+        var selectors = ['[class*="tab"]', '[class*="Tab"]', '[class*="button"]',
+                         '[class*="Button"]', 'a', 'span', 'div', 'li'];
+        for (var s = 0; s < selectors.length; s++) {
+            try {
+                var els = document.querySelectorAll(selectors[s]);
+                for (var i = 0; i < els.length; i++) {
+                    var el = els[i];
+                    var text = (el.textContent || '').trim();
+                    if (!text || text.length > 15) continue;
+                    if (text.indexOf(keyword) === -1) continue;
+                    var rect = el.getBoundingClientRect();
+                    if (rect.width < 20 || rect.height < 20) continue;
+                    if (rect.top > maxY) continue;
+                    // 排除数据 Tab（包含这些关键词的不是切换按钮）
+                    if (text.indexOf('变压器') !== -1 || text.indexOf('线路') !== -1 ||
+                        text.indexOf('潮流') !== -1 || text.indexOf('息') !== -1) continue;
+                    candidates.push({
+                        text: text,
+                        x: rect.left + rect.width / 2,
+                        y: rect.top + rect.height / 2,
+                        cls: el.className ? String(el.className).substring(0, 60) : ''
+                    });
+                }
+            } catch(e) {}
+        }
+        if (candidates.length > 0) {
+            candidates.sort(function(a, b) { return a.y - b.y; });
+            return candidates[0];
+        }
+        return null;
+    })()
+    """.replace("__KW__", switch_keyword)
+
+    try:
+        result = page.evaluate(js_code)
+        return result
+    except Exception as e:
+        print(f"   [switch JS错误: {e}]")
+        return None
 
 
+# ============================================================
+# 新增：按模式运行
+# ============================================================
 def run_mode(mode, dates, browser):
-    """运行单个模式（actual 或 forecast）"""
+    """运行单个模式"""
     cfg = MODE_CONFIG[mode]
     url = cfg['url']
     tab_keywords = cfg['tab_keywords']
@@ -397,12 +385,12 @@ def run_mode(mode, dates, browser):
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     time.sleep(5)
 
-    # 页面内切换到 actual/forecast
+    # 页面内切换
     if switch_kw:
         print(f"\n🔀 在页面内查找并点击\"{switch_kw}\"按钮...")
         sw_el = switch_mode_in_page(page, switch_kw)
         if sw_el:
-            print(f"   找到: {sw_el.get('text')} ({sw_el.get('class','')})")
+            print(f"   找到: {sw_el.get('text')} ({sw_el.get('cls', '')})")
             page.mouse.click(sw_el['x'], sw_el['y'])
             time.sleep(3)
         else:
@@ -506,7 +494,6 @@ def main():
         dates = [yest.strftime('%Y-%m-%d')]
         print(f" 🎯 默认日期: {dates[0]}")
 
-    # 确定要运行的模式
     modes = ['actual', 'forecast'] if args.mode == 'both' else [args.mode]
 
     print(f"\n🔗 连接 Chrome（{LOCAL_CHROME_DEBUG}）...")
