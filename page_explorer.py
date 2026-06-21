@@ -143,10 +143,10 @@ def main():
 
         print(f"🌐 使用已有页面: {page.url[:80]}...")
 
-        # 如果页面不在数据页，导航过去
-        if 'informationDisclosure' not in page.url:
-            page.goto(URL, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(5)
+        # 导航到数据页面（确保菜单完整）
+        print(f"🌐 导航到数据页面...")
+        page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+        time.sleep(5)
 
         # 等待侧边栏出现
         try:
