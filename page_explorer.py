@@ -143,10 +143,11 @@ def main():
 
         print(f"🌐 使用已有页面: {page.url[:80]}...")
 
-        # 导航到数据页面（确保菜单完整）
-        print(f"🌐 导航到数据页面...")
-        page.goto(URL, wait_until="domcontentloaded", timeout=60000)
-        time.sleep(5)
+        # 不导航，直接使用当前页面（请确保已在数据页面）
+        if 'informationDisclosure' not in page.url:
+            print("⚠️ 当前不在数据页面，请手动导航到: 省内现货 → 信息披露 → 电网运行实际信息")
+            print("   然后重新运行此脚本")
+            return
 
         # 等待侧边栏出现
         try:
@@ -233,8 +234,6 @@ def main():
         print(f"\n📊 统计: {len(results)}个页面, {len(pages_with_tabs)}个有数据Tab")
         for r in pages_with_tabs:
             print(f"   [{r['tab_count']}Tab] {r['path']}")
-
-        page.close()
 
     print(f"\n✅ 完成")
 
