@@ -44,82 +44,100 @@ MODE_CONFIG = {
 # ============================================================
 
 def extract_vue_tables(page):
-    return page.evaluate("""() => {
-        const result = {};
-        document.querySelectorAll('.elx-table').forEach((table, idx) => {
-            const vue = table.__vue__;
-            if (!vue) return;
-            let rows = vue.tableSourceData || vue.tableFullData || vue.tableData || [];
-            if (!rows || rows.length === 0) return;
-            result['t' + idx] = {rows: rows, count: rows.length};
-        });
+    return page.evaluate("""
+    (function() {
+        var result = {};
+        var tables = document.querySelectorAll('.elx-table');
+        for (var i = 0; i < tables.length; i++) {
+            var vue = tables[i].__vue__;
+            if (!vue) continue;
+            var rows = vue.tableSourceData || vue.tableFullData || vue.tableData;
+            if (!rows || rows.length === 0) continue;
+            result['t' + i] = {rows: rows, count: rows.length};
+        }
         return result;
-    }""")
+    })()
+    """)
 
 def scroll_to_load(page):
-    page.evaluate("""() => {
+    page.evaluate("""
+    (function() {
         window.scrollBy(0, 800);
-        document.querySelectorAll('.el-table__body-wrapper, .el-scrollbar__wrap, [class*=scroll]').forEach(el => {
-            if (el.scrollHeight > el.clientHeight) el.scrollTop = el.scrollHeight / 2;
-        });
-    }""")
+        var els = document.querySelectorAll('.el-table__body-wrapper, .el-scrollbar__wrap, [class*=scroll]');
+        for (var i = 0; i < els.length; i++) {
+            if (els[i].scrollHeight > els[i].clientHeight) els[i].scrollTop = els[i].scrollHeight / 2;
+        }
+    })()
+    """)
     time.sleep(1)
-    page.evaluate("""() => {
+    page.evaluate("""
+    (function() {
         window.scrollBy(0, 800);
-        document.querySelectorAll('.el-table__body-wrapper, .el-scrollbar__wrap, [class*=scroll]').forEach(el => {
-            if (el.scrollHeight > el.clientHeight) el.scrollTop = el.scrollHeight;
-        });
-    }""")
+        var els = document.querySelectorAll('.el-table__body-wrapper, .el-scrollbar__wrap, [class*=scroll]');
+        for (var i = 0; i < els.length; i++) {
+            if (els[i].scrollHeight > els[i].clientHeight) els[i].scrollTop = els[i].scrollHeight;
+        }
+    })()
+    """)
     time.sleep(1)
-    page.evaluate("""() => { window.scrollTo(0, 0); }""")
+    page.evaluate("window.scrollTo(0, 0);")
     time.sleep(0.5)
 
 def open_date_picker(page):
-    pos = page.evaluate("""() => {
-        const input = document.querySelector('.el-date-editor .el-input__inner');
+    pos = page.evaluate("""
+    (function() {
+        var input = document.querySelector('.el-date-editor .el-input__inner');
         if (!input) return null;
-        const rect = input.getBoundingClientRect();
+        var rect = input.getBoundingClientRect();
         return {x: rect.left + rect.width/2, y: rect.top + rect.height/2};
-    }""")
+    })()
+    """)
     if not pos: return False
     page.mouse.click(pos['x'], pos['y'])
     time.sleep(1)
     return True
 
 def get_picker_header(page):
-    return page.evaluate("""() => {
-        const picker = document.querySelector('.el-picker-panel, .el-date-picker');
+    return page.evaluate("""
+    (function() {
+        var picker = document.querySelector('.el-picker-panel, .el-date-picker');
         if (!picker) return null;
-        const header = picker.querySelector('.el-date-picker__header, .el-picker-panel__header');
+        var header = picker.querySelector('.el-date-picker__header, .el-picker-panel__header');
         if (!header) return null;
-        const text = header.textContent.trim();
-        const btns = header.querySelectorAll('button');
-        let prev = null, next = null;
+        var text = header.textContent.trim();
+        var btns = header.querySelectorAll('button');
+        var prev = null, next = null;
         if (btns.length >= 2) {
-            const r0 = btns[0].getBoundingClientRect();
-            const r1 = btns[1].getBoundingClientRect();
+            var r0 = btns[0].getBoundingClientRect();
+            var r1 = btns[1].getBoundingClientRect();
             prev = {x: r0.left + r0.width/2, y: r0.top + r0.height/2};
             next = {x: r1.left + r1.width/2, y: r1.top + r1.height/2};
         }
-        return { text: text[:30], prevBtn: prev, nextBtn: next };
-    }""")
+        return { text: text.slice(0, 30), prevBtn: prev, nextBtn: next };
+    })()
+    """)
 
 def click_day(page, target_day):
-    pos = page.evaluate("""() => {
-        const picker = document.querySelector('.el-picker-panel, .el-date-picker');
+    js = """
+    (function() {
+        var picker = document.querySelector('.el-picker-panel, .el-date-picker');
         if (!picker) return null;
-        const cells = picker.querySelectorAll('td');
-        for (const cell of cells) {
-            const cls = cell.className;
-            if (cell.textContent.trim() === String(__TARGET_DAY__) &&
-                !cls.includes('prev') && !cls.includes('next') &&
-                !cls.includes('prev-month') && !cls.includes('next-month')) {
-                const rect = cell.getBoundingClientRect();
+        var cells = picker.querySelectorAll('td');
+        var target = String(__TARGET_DAY__);
+        for (var i = 0; i < cells.length; i++) {
+            var cell = cells[i];
+            var cls = cell.className || '';
+            if (cell.textContent.trim() === target &&
+                cls.indexOf('prev') === -1 && cls.indexOf('next') === -1 &&
+                cls.indexOf('prev-month') === -1 && cls.indexOf('next-month') === -1) {
+                var rect = cell.getBoundingClientRect();
                 return {x: rect.left + rect.width/2, y: rect.top + rect.height/2};
             }
         }
         return null;
-    }""".replace("__TARGET_DAY__", str(target_day)))
+    })()
+    """.replace("__TARGET_DAY__", str(target_day))
+    pos = page.evaluate(js)
     if not pos: return False
     page.mouse.click(pos['x'], pos['y'])
     time.sleep(2.5)
@@ -155,22 +173,24 @@ def export_section_xhr(page):
     """通过 XHR 拦截获取断面约束导出 Excel"""
     print(f"\n   📥 XHR拦截导出...", end=" ", flush=True)
 
-    page.evaluate("""() => {
+    page.evaluate("""
+    (function() {
         window.__xhrExport = {done: false, data: null, size: 0};
-        const origOpen = XMLHttpRequest.prototype.open;
+        var origOpen = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function(method, url) {
             this._url = url;
             return origOpen.apply(this, arguments);
         };
-        const origSend = XMLHttpRequest.prototype.send;
+        var origSend = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.send = function(body) {
-            if (this._url && this._url.includes('exportExcel')) {
+            var self = this;
+            if (this._url && this._url.indexOf('exportExcel') !== -1) {
                 this.responseType = 'arraybuffer';
                 this.addEventListener('load', function() {
-                    if (this.response && this.response.byteLength > 0) {
-                        const bytes = new Uint8Array(this.response);
-                        let binary = '';
-                        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                    if (self.response && self.response.byteLength > 0) {
+                        var bytes = new Uint8Array(self.response);
+                        var binary = '';
+                        for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                         window.__xhrExport.data = btoa(binary);
                         window.__xhrExport.size = bytes.length;
                         window.__xhrExport.done = true;
@@ -179,49 +199,54 @@ def export_section_xhr(page):
             }
             return origSend.apply(this, arguments);
         };
-    }""")
+    })()
+    """)
 
-    page.evaluate("""() => {
-        document.querySelectorAll('.el-dialog__wrapper, .v-modal').forEach(el => {
-            el.style.display = 'none';
-        });
-    }""")
+    page.evaluate("""
+    (function() {
+        var els = document.querySelectorAll('.el-dialog__wrapper, .v-modal');
+        for (var i = 0; i < els.length; i++) els[i].style.display = 'none';
+    })()
+    """)
     time.sleep(0.3)
 
-    page.evaluate("""() => {
-        const btns = document.querySelectorAll('.el-button--primary');
-        for (const b of btns) {
-            if ((b.textContent || '').includes('导出')) {
+    page.evaluate("""
+    (function() {
+        var btns = document.querySelectorAll('.el-button--primary');
+        for (var i = 0; i < btns.length; i++) {
+            var b = btns[i];
+            if ((b.textContent || '').indexOf('导出') !== -1) {
                 b.click();
                 return;
             }
         }
-    }""")
+    })()
+    """)
 
     for i in range(20):
         time.sleep(0.5)
-        status = page.evaluate("""() => {
-            return {done: window.__xhrExport.done, size: window.__xhrExport.size || 0};
-        }""")
+        status = page.evaluate("window.__xhrExport ? {done: window.__xhrExport.done, size: window.__xhrExport.size || 0} : {done: false, size: 0}")
         if status['done']:
             print(f"✅ {status['size']/1024:.0f}KB", end=" ", flush=True)
             break
     else:
         print(f"⏰ 超时")
-        page.evaluate("""() => {
-            document.querySelectorAll('.el-dialog__wrapper, .v-modal').forEach(el => {
-                el.style.display = '';
-            });
-        }""")
+        page.evaluate("""
+        (function() {
+            var els = document.querySelectorAll('.el-dialog__wrapper, .v-modal');
+            for (var i = 0; i < els.length; i++) els[i].style.display = '';
+        })()
+        """)
         return None
 
-    data_b64 = page.evaluate("""() => window.__xhrExport.data || null""")
+    data_b64 = page.evaluate("window.__xhrExport ? window.__xhrExport.data : null")
 
-    page.evaluate("""() => {
-        document.querySelectorAll('.el-dialog__wrapper, .v-modal').forEach(el => {
-            el.style.display = '';
-        });
-    }""")
+    page.evaluate("""
+    (function() {
+        var els = document.querySelectorAll('.el-dialog__wrapper, .v-modal');
+        for (var i = 0; i < els.length; i++) els[i].style.display = '';
+    })()
+    """)
 
     if not data_b64:
         return None
@@ -269,15 +294,21 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 
         print(f"  📊 [{tab_idx+1}/{len(data_tabs)}] {tab['text']}...", end=" ", flush=True)
         try:
+            # 步骤1：点击Tab
             page.mouse.click(tab['x'], tab['y'])
             time.sleep(2)
 
-            pick_date(page, ty, tm, td)
+            # 步骤2：选择日期
+            date_ok = pick_date(page, ty, tm, td)
+            if not date_ok:
+                print(f"   ⚠️ 日期选择器无法打开")
+                continue
             time.sleep(1.5)
 
+            # 步骤3：滚动加载
             scroll_to_load(page)
 
-            # 断面约束：XHR导出
+            # 步骤4：XHR导出 或 Vue提取
             if any(kw in tab['text'] for kw in xhr_tabs):
                 excel_data = export_section_xhr(page)
                 if excel_data:
@@ -304,7 +335,7 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
                 print(f"   ⚠️ 无数据")
 
         except Exception as e:
-            print(f"❌ {e}")
+            print(f"❌ {type(e).__name__}: {e}")
 
     return all_data, total_rows
 
@@ -397,17 +428,21 @@ def run_mode(mode, dates, browser):
             print(f"   ⚠️ 未找到\"{switch_kw}\"切换按钮（可能已在正确页面）")
 
     print("\n🔘 获取 Tab...")
-    tabs = page.evaluate("""() => {
-        const tabs = [];
-        document.querySelectorAll('[class*=tab], .el-tabs__item').forEach(el => {
-            const text = el.textContent.trim();
-            const rect = el.getBoundingClientRect();
+    tabs = page.evaluate("""
+    (function() {
+        var result = [];
+        var els = document.querySelectorAll('[class*=tab], .el-tabs__item');
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            var text = (el.textContent || '').trim();
+            var rect = el.getBoundingClientRect();
             if (text && text.length < 40 && rect.width > 0 && rect.height > 0 && rect.top > 50) {
-                tabs.push({text, x: rect.left + rect.width/2, y: rect.top + rect.height/2});
+                result.push({text: text, x: rect.left + rect.width/2, y: rect.top + rect.height/2});
             }
-        });
-        return tabs;
-    }""")
+        }
+        return result;
+    })()
+    """)
     data_tabs = [t for t in tabs if any(k in t['text'] for k in tab_keywords)]
     print(f"   页面共 {len(tabs)} 个 Tab，匹配 {len(data_tabs)} 个:")
     for t in data_tabs:
