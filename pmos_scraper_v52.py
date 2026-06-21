@@ -45,17 +45,41 @@ MODE_CONFIG = {
 
 
 def extract_vue_tables(page):
-    return page.evaluate("""() => {
-        const result = {};
-        document.querySelectorAll('.elx-table').forEach((table, idx) => {
-            const vue = table.__vue__;
-            if (!vue) return;
-            let rows = vue.tableSourceData || vue.tableFullData || vue.tableData || [];
-            if (!rows || rows.length === 0) return;
-            result['t' + idx] = {rows: rows, count: rows.length};
-        });
+    """提取 Vue 表格数据，兼容多种 Vue 组件属性名"""
+    js_code = """
+    (function() {
+        var result = {};
+        var tables = document.querySelectorAll('.el-table, .elx-table');
+        for (var i = 0; i < tables.length; i++) {
+            var table = tables[i];
+            // 尝试多种 Vue 数据路径
+            var vue = table.__vue__ || table.__vueParentComponent__;
+            var rows = null;
+            if (vue) {
+                rows = vue.tableSourceData || vue.tableFullData || vue.tableData ||
+                       vue.table_body_data || vue.tableDataStore || vue.store;
+            }
+            // 如果上面找不到，尝试从 Vue 实例的 $data 里找
+            if (!rows && vue && vue.$data) {
+                var d = vue.$data;
+                rows = d.tableData || d.tableFullData || d.tableSourceData || d.data;
+            }
+            // 尝试从原生 DOM 的 data 属性找
+            if (!rows && table.dataset && table.dataset.tableData) {
+                try { rows = JSON.parse(table.dataset.tableData); } catch(e) {}
+            }
+            if (rows && Array.isArray(rows) && rows.length > 0) {
+                result['t' + i] = {rows: rows, count: rows.length};
+            }
+        }
         return result;
-    }""")
+    })()
+    """
+    try:
+        return page.evaluate(js_code)
+    except Exception as e:
+        print("   [JS错误: " + str(e) + "]")
+        return {}
 
 
 def scroll_to_load(page):
