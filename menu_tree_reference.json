@@ -1,0 +1,113 @@
+{
+  "platform": "河南电力交易平台 (pmos.ha.sgcc.com.cn)",
+  "snapshot_date": "2026-06-21",
+  "menu_tree": [
+    {"level": 1, "name": "首页", "children": [
+      {"level": 2, "name": "留言板"}
+    ]},
+    {"level": 1, "name": "企业信息", "children": [
+      {"level": 2, "name": "基本信息"},
+      {"level": 2, "name": "绿证交易主体信息"},
+      {"level": 2, "name": "机组信息"},
+      {"level": 2, "name": "历史信息"},
+      {"level": 2, "name": "类型转换"},
+      {"level": 2, "name": "注销申请"},
+      {"level": 2, "name": "项目代码补充"},
+      {"level": 2, "name": "正式账号登录阅读公约内容"},
+      {"level": 2, "name": "复牌申请"}
+    ]},
+    {"level": 1, "name": "省间现货", "children": [
+      {"level": 2, "name": "省内单元出清结果"},
+      {"level": 2, "name": "省间现货结算明细"},
+      {"level": 2, "name": "跨经营区现货"},
+      {"level": 2, "name": "新能源省间现货结算明细"}
+    ]},
+    {"level": 1, "name": "基础支撑", "children": [
+      {"level": 2, "name": "用户中心2.0"}
+    ]},
+    {"level": 1, "name": "省内现货", "children": [
+      {"level": 2, "name": "机组参数管理"},
+      {"level": 2, "name": "日前交易申报"},
+      {"level": 2, "name": "交易结果查询"},
+      {"level": 2, "name": "日交易"},
+      {"level": 2, "name": "信息披露", "children": [
+        {"level": 3, "name": "电网运行预测信息", "note": "v52 forecast 模式"},
+        {"level": 3, "name": "电网运行实际信息", "note": "v52 actual 模式"},
+        {"level": 3, "name": "市场交易参数信息"},
+        {"level": 3, "name": "电网运行日内信息"},
+        {"level": 3, "name": "日前出清条件查询"},
+        {"level": 3, "name": "实时出清条件查询"}
+      ]},
+      {"level": 2, "name": "撮合交易"},
+      {"level": 2, "name": "结算结果查询"},
+      {"level": 2, "name": "合同电量分解"}
+    ]},
+    {"level": 1, "name": "绿色消费核算", "children": [
+      {"level": 2, "name": "核算子账户管理"}
+    ]},
+    {"level": 1, "name": "省间现货（新）", "children": [
+      {"level": 2, "name": "日前交易申报(新)"},
+      {"level": 2, "name": "日内交易申报(新)"},
+      {"level": 2, "name": "临时交易申报(新)"},
+      {"level": 2, "name": "省内单元出清结果(新)"},
+      {"level": 2, "name": "历史申报信息查询(新)"},
+      {"level": 2, "name": "历史结果信息查询(新)"},
+      {"level": 2, "name": "国调网调单元出清结果(新)"}
+    ]},
+    {"level": 1, "name": "绿证交易", "leaf": true},
+    {"level": 1, "name": "华中互济", "children": [
+      {"level": 2, "name": "日前申报"},
+      {"level": 2, "name": "日前出清结果"},
+      {"level": 2, "name": "日内申报"},
+      {"level": 2, "name": "日内出清结果"},
+      {"level": 2, "name": "临时申报"},
+      {"level": 2, "name": "临时出清结果"},
+      {"level": 2, "name": "缺省申报"}
+    ]},
+    {"level": 1, "name": "省内中长期交易", "children": [
+      {"level": 2, "name": "交易公告"},
+      {"level": 2, "name": "结果查询"},
+      {"level": 2, "name": "交易电量预测申报"}
+    ]},
+    {"level": 1, "name": "我的合同", "children": [
+      {"level": 2, "name": "当前合同"},
+      {"level": 2, "name": "存量合同调整"},
+      {"level": 2, "name": "历史合同"},
+      {"level": 2, "name": "批发电量调整申请"},
+      {"level": 2, "name": "批发电量调整确认"},
+      {"level": 2, "name": "合同电量转让确认"},
+      {"level": 2, "name": "省内合同电子签章"}
+    ]},
+    {"level": 1, "name": "发电计划", "children": [
+      {"level": 2, "name": "发电侧计划查询"},
+      {"level": 2, "name": "检修状态申报"},
+      {"level": 2, "name": "厂用电率申报"},
+      {"level": 2, "name": "月度发电方案完成率"}
+    ]},
+    {"level": 1, "name": "我的结算", "children": [
+      {"level": 2, "name": "结算单查询"},
+      {"level": 2, "name": "上网电量结算单填报"},
+      {"level": 2, "name": "上网电量结算单查询"}
+    ]},
+    {"level": 1, "name": "信用信息", "children": [
+      {"level": 2, "name": "场外信息申报"},
+      {"level": 2, "name": "申报历史查询"},
+      {"level": 2, "name": "信用报告查询"},
+      {"level": 2, "name": "申诉情况查询"},
+      {"level": 2, "name": "信用投诉"},
+      {"level": 2, "name": "信用修复"}
+    ]},
+    {"level": 1, "name": "信息披露", "children": [
+      {"level": 2, "name": "承诺书"},
+      {"level": 2, "name": "市场主体披露"},
+      {"level": 2, "name": "信息披露扩增变更申请"},
+      {"level": 2, "name": "信息披露意见箱"},
+      {"level": 2, "name": "综合查询"},
+      {"level": 2, "name": "结算公告"}
+    ]},
+    {"level": 1, "name": "系统管理", "children": [
+      {"level": 2, "name": "人脸认证"},
+      {"level": 2, "name": "个性化设置"}
+    ]}
+  ]
+}
