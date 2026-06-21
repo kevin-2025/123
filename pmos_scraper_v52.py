@@ -380,56 +380,6 @@ def scrape_single_date(page, date_str, data_tabs, tab_positions, mode_cfg):
 
 
 # ============================================================
-# 新增：展开所有菜单，打印完整菜单树
-# ============================================================
-def expand_all_menus(page):
-    """展开所有侧边栏菜单层级，打印完整菜单树"""
-    # 多轮展开：先展开一级，再展开二级，再展开三级
-    for _ in range(3):
-        page.evaluate("""
-        (function() {
-            var items = document.querySelectorAll('[role="treeitem"]');
-            for (var i = 0; i < items.length; i++) {
-                var el = items[i];
-                var aria = el.getAttribute('aria-expanded');
-                if (aria === 'false' || !aria) {
-                    el.click();
-                }
-            }
-        })()
-        """)
-        time.sleep(2)
-
-    # 打印完整菜单树（带层级缩进）
-    all_items = page.evaluate("""
-    (function() {
-        var items = document.querySelectorAll('[role="treeitem"]');
-        var result = [];
-        for (var i = 0; i < items.length; i++) {
-            var text = (items[i].textContent || '').trim();
-            var aria = items[i].getAttribute('aria-expanded') || '';
-            var level = 0;
-            var parent = items[i].parentElement;
-            while (parent) {
-                if (parent.getAttribute && parent.getAttribute('role') === 'group') level++;
-                parent = parent.parentElement;
-            }
-            result.push({text: text.substring(0, 50), level: level, expanded: aria});
-        }
-        return result;
-    })()
-    """)
-
-    print(f"\n   📋 完整菜单树 ({len(all_items)}项):")
-    for it in all_items:
-        indent = "  " * it['level']
-        mark = "▼" if it['expanded'] == 'true' else "▶"
-        print(f"      {indent}{mark} {it['text']}")
-
-    return all_items
-
-
-# ============================================================
 # 页面内模式切换（实际/预测）
 # ============================================================
 def switch_mode_in_page(page, switch_to):
