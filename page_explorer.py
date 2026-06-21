@@ -172,13 +172,16 @@ def get_leaves(page):
         var result = [];
         for (var i = 0; i < items.length; i++) {
             var el = items[i];
-            // 有 aria-expanded → 父节点，跳过
+            // 有 aria-expanded → 父节点
             if (el.hasAttribute('aria-expanded')) continue;
+            // 下一个兄弟是 [role="group"] → 父节点（有子菜单）
+            var next = el.nextElementSibling;
+            if (next && next.getAttribute('role') === 'group') continue;
             var text = (el.textContent || '').trim();
-            // textContent 过长说明包含子节点文本 → 父节点，跳过
-            if (text.length > 25) continue;
             // 跳过弹窗页面
             if (text === '绿证交易') continue;
+            // 跳过超长文本（父节点 textContent 含子节点）
+            if (text.length > 30) continue;
             result.push(text.substring(0, 50));
         }
         return result;
