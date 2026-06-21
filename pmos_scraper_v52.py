@@ -391,7 +391,6 @@ def switch_mode_in_page(page, switch_to):
         for (var i = 0; i < items.length; i++) {
             var text = (items[i].textContent || '').trim();
             if (text.indexOf('信息披露') !== -1 && text.length < 20) {
-                // 检查是否已展开，未展开则点击
                 var ariaExpanded = items[i].getAttribute('aria-expanded');
                 if (ariaExpanded !== 'true') {
                     items[i].click();
@@ -401,10 +400,27 @@ def switch_mode_in_page(page, switch_to):
         }
     })()
     """)
-    time.sleep(1.5)
+    time.sleep(2)
 
-    # 再点击目标 treeitem
-    js_code = """
+    # 先打印所有 treeitem 文本（调试用）
+    all_items = page.evaluate("""
+    (function() {
+        var items = document.querySelectorAll('[role="treeitem"]');
+        var result = [];
+        for (var i = 0; i < items.length; i++) {
+            var text = (items[i].textContent || '').trim();
+            var aria = items[i].getAttribute('aria-expanded') || '';
+            result.push(text.substring(0, 40) + (aria ? ' [' + aria + ']' : ''));
+        }
+        return result;
+    })()
+    """)
+    print(f"   📋 侧边栏 treeitem ({len(all_items)}个):")
+    for it in all_items[:30]:
+        print(f"      - {it}")
+
+    # 直接用 element.click() 点击目标 treeitem，不依赖坐标
+    clicked = page.evaluate("""
     (function() {
         var target = "__TARGET__";
         var items = document.querySelectorAll('[role="treeitem"]');
@@ -412,26 +428,64 @@ def switch_mode_in_page(page, switch_to):
             var el = items[i];
             var text = (el.textContent || '').trim();
             if (text.indexOf(target) !== -1 && text.length < 30) {
-                var rect = el.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    return {
-                        text: text.substring(0, 30),
-                        x: rect.left + rect.width / 2,
-                        y: rect.top + rect.height / 2
-                    };
-                }
+                el.click();
+                return text.substring(0, 30);
             }
         }
         return null;
     })()
-    """.replace("__TARGET__", switch_to)
+    """.replace("__TARGET__", switch_to))
 
-    try:
-        result = page.evaluate(js_code)
-        return result
-    except Exception as e:
-        print(f"   [switch JS错误: {e}]")
-        return None
+    if clicked:
+        print(f"   ✅ 已点击: {clicked}")
+        time.sleep(3)
+        return True
+
+    # 没找到 → 尝试滚动侧边栏后再搜（虚拟滚动可能隐藏了部分项）
+    print(f"   🔄 尝试滚动侧边栏以加载更多 treeitem...")
+    page.evaluate("""
+    (function() {
+        var sidebar = document.querySelector('.el-menu, [class*=sidebar], [class*=menu], [class*=nav]');
+        if (!sidebar) {
+            var scrollEls = document.querySelectorAll('[class*=scroll]');
+            for (var i = 0; i < scrollEls.length; i++) {
+                if (scrollEls[i].scrollHeight > scrollEls[i].clientHeight + 50) {
+                    sidebar = scrollEls[i];
+                    break;
+                }
+            }
+        }
+        if (sidebar) {
+            sidebar.scrollTop = sidebar.scrollHeight;
+        }
+    })()
+    """)
+    time.sleep(1.5)
+
+    # 再次搜索
+    clicked = page.evaluate("""
+    (function() {
+        var target = "__TARGET__";
+        var items = document.querySelectorAll('[role="treeitem"]');
+        for (var i = 0; i < items.length; i++) {
+            var el = items[i];
+            var text = (el.textContent || '').trim();
+            if (text.indexOf(target) !== -1 && text.length < 30) {
+                el.click();
+                return text.substring(0, 30);
+            }
+        }
+        return null;
+    })()
+    """.replace("__TARGET__", switch_to))
+
+    if clicked:
+        print(f"   ✅ 滚动后找到并点击: {clicked}")
+        time.sleep(3)
+        return True
+    else:
+        print(f"   ❌ 滚动后仍未找到含\"{switch_to}\"的 treeitem")
+        return False
 
 
 # ============================================================
@@ -460,13 +514,8 @@ def run_mode(mode, dates, browser):
 
     # 点击侧边栏 treeitem 切换到目标页面
     print(f"\n🔀 在侧边栏查找并点击\"{switch_to}\"...")
-    sw_el = switch_mode_in_page(page, switch_to)
-    if sw_el:
-        print(f"   找到: {sw_el.get('text')}")
-        page.mouse.click(sw_el['x'], sw_el['y'])
-        time.sleep(3)
-    else:
-        print(f"   ⚠️ 未找到\"{switch_to}\"侧边栏项（可能已在正确页面）")
+    if not switch_mode_in_page(page, switch_to):
+        print(f"   ⚠️ 侧边栏切换失败，将使用当前页面数据")
 
     print("\n🔘 获取 Tab...")
     tabs = page.evaluate("""
